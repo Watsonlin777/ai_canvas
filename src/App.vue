@@ -1,7 +1,10 @@
 <template>
   <div class="app-container">
     <header class="app-header">
-      <h1 class="app-title">{{ chartStore.title }}</h1>
+      <div class="header-content">
+        <h1 class="app-title">🌟 AI 数学可视化工具</h1>
+        <p class="app-subtitle">小学数学折线统计图教学神器</p>
+      </div>
       <button class="settings-btn" @click="showSettings = !showSettings">
         <span class="icon">⚙️</span>
         设置
@@ -9,17 +12,16 @@
     </header>
     
     <main class="app-main">
-      <aside class="sidebar-left">
-        <DataManager />
-      </aside>
+      <SceneSelection 
+        v-if="!currentScene" 
+        @sceneSelected="handleSceneSelected" 
+      />
       
-      <section class="chart-area">
-        <ChartDisplay />
-      </section>
-      
-      <aside class="sidebar-right">
-        <PredictionPanel />
-      </aside>
+      <SceneContent 
+        v-else 
+        :scene="currentScene" 
+        @back="handleBack" 
+      />
     </main>
     
     <SettingsPanel v-if="showSettings" @close="showSettings = false" />
@@ -33,9 +35,20 @@ import DataManager from './components/DataManager/DataManager.vue'
 import ChartDisplay from './components/Chart/ChartDisplay.vue'
 import PredictionPanel from './components/Prediction/PredictionPanel.vue'
 import SettingsPanel from './components/Settings/SettingsPanel.vue'
+import SceneSelection from './components/SceneSelection/SceneSelection.vue'
+import SceneContent from './components/SceneContent/SceneContent.vue'
 
 const chartStore = useChartStore()
 const showSettings = ref(false)
+const currentScene = ref(null)
+
+function handleSceneSelected(scene) {
+  currentScene.value = scene
+}
+
+function handleBack() {
+  currentScene.value = null
+}
 </script>
 
 <style scoped>
@@ -43,73 +56,88 @@ const showSettings = ref(false)
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #F8F9FA;
+  background: linear-gradient(135deg, #F8F9FA 0%, #E8F4F8 100%);
 }
 
 .app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 24px;
   background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  padding: 20px 32px;
+}
+
+.header-content {
+  text-align: center;
+  margin-bottom: 8px;
 }
 
 .app-title {
-  font-size: 24px;
+  font-size: 32px;
   color: #4A90E2;
+  margin: 0 0 8px 0;
+  font-weight: 700;
+  background: linear-gradient(135deg, #4A90E2 0%, #00BCD4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.app-subtitle {
+  font-size: 16px;
+  color: #666;
   margin: 0;
 }
 
 .settings-btn {
+  position: absolute;
+  top: 20px;
+  right: 32px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: #4A90E2;
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
   transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
 }
 
 .settings-btn:hover {
-  background: #357ABD;
   transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(74, 144, 226, 0.4);
 }
 
 .app-main {
-  display: flex;
   flex: 1;
-  padding: 20px;
-  gap: 20px;
+  padding: 40px 20px;
 }
 
-.sidebar-left {
-  width: 280px;
-  flex-shrink: 0;
-}
-
-.chart-area {
-  flex: 1;
-  min-width: 0;
-}
-
-.sidebar-right {
-  width: 280px;
-  flex-shrink: 0;
-}
-
-@media (max-width: 1200px) {
-  .app-main {
-    flex-direction: column;
+@media (max-width: 640px) {
+  .app-header {
+    padding: 16px 20px;
   }
   
-  .sidebar-left,
-  .sidebar-right {
+  .app-title {
+    font-size: 24px;
+  }
+  
+  .app-subtitle {
+    font-size: 14px;
+  }
+  
+  .settings-btn {
+    position: static;
+    margin-top: 12px;
     width: 100%;
+    justify-content: center;
+  }
+  
+  .app-main {
+    padding: 20px 12px;
   }
 }
 </style>
