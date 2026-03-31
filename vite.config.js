@@ -4,6 +4,7 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [vue()],
+  base: './',
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
@@ -12,5 +13,10 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    emptyOutDir: true
   }
 })
