@@ -1,0 +1,413 @@
+<template>
+  <div class="chart-display card">
+    <div class="chart-toolbar">
+      <div class="chart-type-buttons">
+        <button 
+          v-for="type in chartTypes" 
+          :key="type.value"
+          :class="['type-btn', { active: chartStore.chartType === type.value }]"
+          @click="changeChartType(type.value)"
+        >
+          {{ type.icon }} {{ type.label }}
+        </button>
+      </div>
+      
+      <div class="chart-actions">
+        <button 
+          :class="['action-btn', { active: chartStore.showTrendLine }]"
+          @click="chartStore.toggleTrendLine"
+        >
+          📈 趋势线
+        </button>
+      </div>
+    </div>
+    
+    <div class="chart-container" ref="chartContainer">
+      <v-chart 
+        ref="chartRef"
+        :option="chartOption" 
+        :autoresize="true"
+        @click="handleChartClick"
+        @mousedown="handleMouseDown"
+      />
+    </div>
+    
+    <div class="chart-info">
+      <span>数据点: {{ chartStore.dataItems.length }}</span>
+      <span>最大值: {{ maxValue }}</span>
+      <span>最小值: {{ minValue }}</span>
+      <span>平均值: {{ avgValue.toFixed(1) }}</span>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { BarChart, LineChart, ScatterChart } from 'echarts/charts'
+import {
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent
+} from 'echarts/components'
+import VChart from 'vue-echarts'
+import { useChartStore } from '../../store/chartStore'
+import gsap from 'gsap'
+
+use([
+  CanvasRenderer,
+  BarChart,
+  LineChart,
+  ScatterChart,
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent
+])
+
+const chartStore = useChartStore()
+const chartRef = ref(null)
+const chartContainer = ref(null)
+const isDragging = ref(false)
+const dragIndex = ref(-1)
+
+const chartTypes = [
+  { value: 'bar', label: '柱形图', icon: '📊' },
+  { value: 'scatter', label: '点状图', icon: '⭐' },
+  { value: 'line', label: '折线图', icon: '📈' }
+]
+
+const maxValue = computed(() => Math.max(...chartStore.values))
+const minValue = computed(() => Math.min(...chartStore.values))
+const avgValue = computed(() => {
+  const sum = chartStore.values.reduce((a, b) => a + b, 0)
+  return sum / chartStore.values.length
+})
+
+const chartOption = computed(() => {
+  const baseOption = {
+    title: {
+      text: chartStore.title,
+      left: 'center',
+      textStyle: {
+        fontSize: 20,
+        color: '#333'
+      }
+    },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: chartStore.chartType === 'bar' ? 'shadow' : 'cross'
+      }
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true
+    },
+    xAxis: {
+      type: 'category',
+      name: chartStore.xAxisName,
+      nameLocation: 'middle',
+      nameGap: 30,
+      data: chartStore.labels,
+      axisLabel: {
+        fontSize: 14
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: chartStore.yAxisName,
+      nameLocation: 'middle',
+      nameGap: 40,
+      axisLabel: {
+        fontSize: 14
+      }
+    },
+    animationDuration: 1000 / chartStore.animationSpeed,
+    animationEasing: 'elasticOut'
+  }
+
+  let series = []
+
+  if (chartStore.chartType === 'bar') {
+    series.push({
+      name: chartStore.yAxisName,
+      type: 'bar',
+      data: chartStore.values.map((value, index) => ({
+        value,
+        itemStyle: {
+          color: dragIndex.value === index ? '#F5A623' : '#4A90E2'
+        }
+      })),
+      barWidth: '50%',
+      emphasis: {
+        itemStyle: {
+          color: '#F5A623'
+        }
+      }
+    })
+  } else if (chartStore.chartType === 'scatter') {
+    series.push({
+      name: chartStore.yAxisName,
+      type: 'scatter',
+      data: chartStore.values.map((value, index) => ({
+        value: [index, value],
+        itemStyle: {
+          color: dragIndex.value === index ? '#F5A623' : '#4A90E2'
+        },
+        symbolSize: 15
+      })),
+      emphasis: {
+        itemStyle: {
+          color: '#F5A623'
+        }
+      }
+    })
+  } else if (chartStore.chartType === 'line') {
+    series.push({
+      name: chartStore.yAxisName,
+      type: 'line',
+      data: chartStore.values,
+      smooth: true,
+      lineStyle: {
+        width: 3,
+        color: '#4A90E2'
+      },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(74, 144, 226, 0.3)' },
+            { offset: 1, color: 'rgba(74, 144, 226, 0.05)' }
+          ]
+        }
+      },
+      itemStyle: {
+        color: '#4A90E2'
+      },
+      emphasis: {
+        itemStyle: {
+          color: '#F5A623'
+        }
+      }
+    })
+  }
+
+  if (chartStore.showTrendLine) {
+    const trendData = calculateTrendLine()
+    series.push({
+      name: '趋势线',
+      type: 'line',
+      data: trendData,
+      lineStyle: {
+        type: 'dashed',
+        color: '#7ED321',
+        width: 2
+      },
+      symbol: 'none',
+      smooth: true
+    })
+  }
+
+  if (chartStore.showPrediction && chartStore.predictionResult) {
+    const predictionData = new Array(chartStore.values.length).fill(null)
+    predictionData.push(...chartStore.predictionResult.predictions)
+    
+    const predictionLabels = [...chartStore.labels]
+    for (let i = 0; i < chartStore.predictionResult.predictions.length; i++) {
+      predictionLabels.push(`预测${i + 1}`)
+    }
+
+    series.push({
+      name: '预测值',
+      type: 'line',
+      data: predictionData,
+      lineStyle: {
+        type: 'dotted',
+        color: '#E74C3C',
+        width: 2
+      },
+      symbol: 'circle',
+      symbolSize: 8,
+      itemStyle: {
+        color: '#E74C3C'
+      }
+    })
+  }
+
+  return {
+    ...baseOption,
+    series
+  }
+})
+
+function calculateTrendLine() {
+  const n = chartStore.values.length
+  const x = chartStore.values.map((_, i) => i)
+  const y = chartStore.values
+  
+  const sumX = x.reduce((a, b) => a + b, 0)
+  const sumY = y.reduce((a, b) => a + b, 0)
+  const sumXY = x.reduce((total, xi, i) => total + xi * y[i], 0)
+  const sumX2 = x.reduce((total, xi) => total + xi * xi, 0)
+  
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+  const intercept = (sumY - slope * sumX) / n
+  
+  return x.map(xi => slope * xi + intercept)
+}
+
+function changeChartType(type) {
+  const types = ['bar', 'scatter', 'line']
+  const currentIndex = types.indexOf(chartStore.chartType)
+  const targetIndex = types.indexOf(type)
+  
+  if (currentIndex !== targetIndex) {
+    animateChartTransition(type)
+  }
+}
+
+function animateChartTransition(targetType) {
+  gsap.to({}, {
+    duration: 0.3,
+    onStart: () => {
+      chartStore.setChartType(targetType)
+    }
+  })
+}
+
+function handleChartClick(params) {
+  if (params.componentType === 'series') {
+    dragIndex.value = params.dataIndex
+    setTimeout(() => {
+      dragIndex.value = -1
+    }, 500)
+  }
+}
+
+function handleMouseDown(params) {
+  if (params.componentType === 'series' && chartStore.chartType === 'bar') {
+    isDragging.value = true
+    dragIndex.value = params.dataIndex
+    
+    const handleMouseMove = (e) => {
+      if (isDragging.value && chartContainer.value) {
+        const rect = chartContainer.value.getBoundingClientRect()
+        const chartHeight = rect.height - 100
+        const relativeY = rect.bottom - e.clientY - 50
+        const maxValue = Math.max(...chartStore.values) * 1.2
+        const newValue = Math.round((relativeY / chartHeight) * maxValue)
+        
+        if (newValue >= 0 && dragIndex.value >= 0) {
+          chartStore.updateDataItem(dragIndex.value, 'value', Math.max(0, newValue))
+        }
+      }
+    }
+    
+    const handleMouseUp = () => {
+      isDragging.value = false
+      dragIndex.value = -1
+      chartStore.saveSettings()
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+    
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }
+}
+
+watch(() => chartStore.dataItems, () => {
+  if (chartRef.value) {
+    chartRef.value.setOption(chartOption.value, { notMerge: true })
+  }
+}, { deep: true })
+</script>
+
+<style scoped>
+.chart-display {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #E1E4E8;
+}
+
+.chart-type-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.type-btn {
+  padding: 8px 16px;
+  background: #F8F9FA;
+  border: 2px solid #E1E4E8;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.type-btn:hover {
+  border-color: #4A90E2;
+}
+
+.type-btn.active {
+  background: #4A90E2;
+  color: white;
+  border-color: #4A90E2;
+}
+
+.action-btn {
+  padding: 8px 16px;
+  background: #F8F9FA;
+  border: 2px solid #E1E4E8;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.action-btn.active {
+  background: #7ED321;
+  color: white;
+  border-color: #7ED321;
+}
+
+.chart-container {
+  flex: 1;
+  min-height: 400px;
+}
+
+.chart-info {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px;
+  background: #F8F9FA;
+  border-radius: 8px;
+  margin-top: 16px;
+  font-size: 14px;
+  color: #666;
+}
+
+.chart-info span {
+  padding: 4px 12px;
+  background: white;
+  border-radius: 4px;
+}
+</style>
