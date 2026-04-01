@@ -56,34 +56,39 @@
           </div>
         </div>
         
-        <div class="table-wrapper">
-          <table class="editable-table">
-            <tbody>
-              <tr v-for="(row, rowIndex) in editableData.rows" :key="rowIndex">
-                <td class="row-header-cell">
-                  <input 
-                    type="text" 
-                    class="row-header-input"
-                    v-model="rowHeaders[rowIndex]"
-                    @input="handleDataChange"
-                    :placeholder="`行${rowIndex + 1}`"
-                  />
-                </td>
-                <td v-for="(cell, colIndex) in row" :key="colIndex" class="data-cell">
-                  <input 
-                    type="number" 
-                    class="cell-input"
-                    v-model.number="editableData.rows[rowIndex][colIndex]"
-                    @input="handleDataChange"
-                    :placeholder="getPlaceholder(rowIndex, colIndex)"
-                  />
-                </td>
-                <td class="actions-cell">
-                  <button class="btn-delete" @click="deleteRow(rowIndex)" title="删除此行">✕</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="table-with-actions">
+          <div class="table-wrapper">
+            <table class="editable-table">
+              <tbody>
+                <tr v-for="(row, rowIndex) in editableData.rows" :key="rowIndex">
+                  <td class="row-header-cell">
+                    <input 
+                      type="text" 
+                      class="row-header-input"
+                      v-model="rowHeaders[rowIndex]"
+                      @input="handleDataChange"
+                      :placeholder="`行${rowIndex + 1}`"
+                    />
+                  </td>
+                  <td v-for="(cell, colIndex) in row" :key="colIndex" class="data-cell">
+                    <input 
+                      type="number" 
+                      class="cell-input"
+                      v-model.number="editableData.rows[rowIndex][colIndex]"
+                      @input="handleDataChange"
+                      :placeholder="getPlaceholder(rowIndex, colIndex)"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="table-actions-row">
+            <div class="action-cell" v-for="(row, rowIndex) in editableData.rows" :key="'del-'+rowIndex">
+              <button class="btn-delete" @click="deleteRow(rowIndex)" title="删除此行">✕</button>
+            </div>
+          </div>
         </div>
         
         <div class="add-row-section">
@@ -649,10 +654,18 @@ onMounted(() => {
   transform: scale(1.1);
 }
 
-.table-wrapper {
-  overflow-x: auto;
-  border-radius: 8px;
+.table-with-actions {
+  display: flex;
   border: 1px solid #E1E4E8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table-wrapper {
+  flex: 1;
+  overflow-x: auto;
+  border: none;
+  border-radius: 0;
 }
 
 .editable-table {
@@ -723,13 +736,26 @@ onMounted(() => {
   font-size: 12px;
 }
 
-.actions-cell {
-  width: 50px;
-  padding: 4px;
+.table-actions-row {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 44px;
+  border-left: 1px solid #E1E4E8;
+  overflow: hidden;
+}
+
+.action-cell {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #F8F9FA;
-  border: 1px solid #E1E4E8;
-  border-right: none;
-  text-align: center;
+  border-bottom: 1px solid #E1E4E8;
+}
+
+.action-cell:last-child {
+  border-bottom: none;
 }
 
 .btn-delete {
