@@ -498,7 +498,9 @@ function emitDataUpdate() {
     }
   }
   
-  if (dataType.value === 'table') {
+  if (viewMode.value === 'flat') {
+    updatedData.data = flatData.value.map(item => ({ ...item }))
+  } else if (dataType.value === 'table') {
     updatedData.data = editableData.value.rows.map(row => [...row])
   } else if (dataType.value === 'categories') {
     updatedData.data = editableData.value.categories.map(item => ({ ...item }))
@@ -597,9 +599,12 @@ function deleteDaily(index) {
 function switchViewMode(mode) {
   if (mode === 'flat') {
     convertToFlat()
+  } else if (viewMode.value === 'flat') {
+    convertFromFlat()
   }
   viewMode.value = mode
   emit('viewModeChange', mode)
+  handleDataChange()
 }
 
 function convertToFlat() {
@@ -634,18 +639,38 @@ function convertToFlat() {
 
 function convertFromFlat() {
   if (dataType.value === 'table') {
-    const maxCols = tableHeaders.value.length
+    const maxCols = tableHeaders.value.length || 3
+    
+    if (maxCols === 0 || flatData.value.length === 0) {
+      return
+    }
+    
     const numRows = Math.ceil(flatData.value.length / maxCols)
     const newRows = []
+    const newRowHeaders = []
+    
     for (let r = 0; r < numRows; r++) {
       const row = []
+      let rowLabel = `行${r + 1}`
+      
       for (let c = 0; c < maxCols; c++) {
         const flatIndex = r * maxCols + c
-        row.push(flatData.value[flatIndex] ? flatData.value[flatIndex].value : 0)
+        if (flatData.value[flatIndex]) {
+          const labelParts = flatData.value[flatIndex].label.split('-')
+          if (labelParts.length === 2) {
+            rowLabel = labelParts[0]
+          }
+          row.push(flatData.value[flatIndex].value)
+        } else {
+          row.push(0)
+        }
       }
       newRows.push(row)
+      newRowHeaders.push(rowLabel)
     }
+    
     editableData.value.rows = newRows
+    rowHeaders.value = newRowHeaders
   } else if (dataType.value === 'categories') {
     editableData.value.categories = flatData.value.map(item => ({
       name: item.label,

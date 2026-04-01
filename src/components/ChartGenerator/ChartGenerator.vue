@@ -228,159 +228,173 @@ const chartOption = computed(() => {
 
   if (isFlat) {
     const flatItems = convertDataToFlat()
-    const labels = flatItems.map(item => item.label)
-    const values = flatItems.map(item => item.value)
+    
+    if (!flatItems || flatItems.length === 0) {
+      xAxis = { type: 'category', data: [] }
+      yAxis = { type: 'value', data: [] }
+      series = []
+    } else {
+        const labels = flatItems.map(item => item.label || '')
+        const values = flatItems.map(item => Number(item.value) || 0)
 
-    xAxis = {
-      type: 'category',
-      data: labels,
-      axisLabel: {
-        fontSize: 11,
-        color: '#666',
-        rotate: labels.length > 8 ? 30 : 0
-      },
-      axisLine: {
-        lineStyle: {
-          color: '#E1E4E8'
-        }
-      }
-    }
-
-    yAxis = {
-      type: 'value',
-      name: props.scene.content.unit || '数值',
-      axisLabel: {
-        fontSize: 12,
-        color: '#666'
-      },
-      axisLine: {
-        lineStyle: {
-          color: '#E1E4E8'
-        }
-      },
-      splitLine: showGrid.value ? {
-        lineStyle: {
-          color: '#F0F0F0',
-          type: 'dashed'
-        }
-      } : { show: false }
-    }
-
-    if (chartType.value === 'bar' || chartType.value === 'line') {
-      series = [{
-        name: props.scene.content.unit || '数值',
-        type: chartType.value,
-        data: values,
-        smooth: chartType.value === 'line' ? smoothLine.value : undefined,
-        label: showLabel.value ? {
-          show: true,
-          position: 'top',
-          fontSize: 11,
-          color: '#333'
-        } : undefined,
-        itemStyle: {
-          color: props.scene.color || '#4A90E2'
-        },
-        lineStyle: {
-          width: 3
-        },
-        areaStyle: chartType.value === 'line' && showArea.value ? {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: (props.scene.color || '#4A90E2') + '4D' },
-              { offset: 1, color: (props.scene.color || '#4A90E2') + '0D' }
-            ]
+        xAxis = {
+          type: 'category',
+          data: labels,
+          axisLabel: {
+            fontSize: 11,
+            color: '#666',
+            rotate: labels.length > 8 ? 30 : 0
+          },
+          axisLine: {
+            lineStyle: {
+              color: '#E1E4E8'
+            }
           }
-        } : null
-      }]
-    } else if (chartType.value === 'pie') {
-      pieData = flatItems.map(item => ({
-        name: item.label,
-        value: item.value
-      }))
+        }
+
+        yAxis = {
+          type: 'value',
+          name: props.scene.content.unit || '数值',
+          axisLabel: {
+            fontSize: 12,
+            color: '#666'
+          },
+          axisLine: {
+            lineStyle: {
+              color: '#E1E4E8'
+            }
+          },
+          splitLine: showGrid.value ? {
+            lineStyle: {
+              color: '#F0F0F0',
+              type: 'dashed'
+            }
+          } : { show: false }
+        }
+
+      if (chartType.value === 'bar' || chartType.value === 'line') {
+        series = [{
+          name: props.scene.content.unit || '数值',
+          type: chartType.value,
+          data: values,
+          smooth: chartType.value === 'line' ? smoothLine.value : undefined,
+          label: showLabel.value ? {
+            show: true,
+            position: 'top',
+            fontSize: 11,
+            color: '#333'
+          } : undefined,
+          itemStyle: {
+            color: props.scene.color || '#4A90E2'
+          },
+          lineStyle: {
+            width: 3
+          },
+          areaStyle: chartType.value === 'line' && showArea.value ? {
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: (props.scene.color || '#4A90E2') + '4D' },
+                { offset: 1, color: (props.scene.color || '#4A90E2') + '0D' }
+              ]
+            }
+          } : null
+        }]
+      } else if (chartType.value === 'pie') {
+        pieData = flatItems.map(item => ({
+          name: item.label,
+          value: Number(item.value) || 0
+        }))
+      }
     }
   } else if (props.data?.type === 'table') {
     const rows = props.data.data || []
-    const colHeaders = props.data.headers?.columns || rows[0]?.map((_, i) => `列${i + 1}`) || []
-    const rowHeaders = props.data.headers?.rows || rows.map((_, i) => `行${i + 1}`) || []
     
-    xAxis = {
-      type: 'category',
-      data: colHeaders,
-      axisLabel: {
-        fontSize: 12,
-        color: '#666'
-      },
-      axisLine: {
-        lineStyle: {
-          color: '#E1E4E8'
-        }
-      }
-    }
-
-    yAxis = {
-      type: 'value',
-      name: props.scene.content.unit || '数值',
-      axisLabel: {
-        fontSize: 12,
-        color: '#666'
-      },
-      axisLine: {
-        lineStyle: {
-          color: '#E1E4E8'
-        }
-      },
-      splitLine: showGrid.value ? {
-        lineStyle: {
-          color: '#F0F0F0',
-          type: 'dashed'
-        }
-      } : { show: false }
-    }
-
-    if (chartType.value === 'bar' || chartType.value === 'line') {
-      series = rows.map((row, index) => ({
-        name: rowHeaders[index] || `行${index + 1}`,
-        type: chartType.value,
-        data: row,
-        smooth: chartType.value === 'line' ? smoothLine.value : undefined,
-        label: showLabel.value ? {
-          show: true,
-          position: 'top',
-          fontSize: 11,
-          color: '#333'
-        } : undefined,
-        itemStyle: {
-          color: getColor(index)
-        },
-        lineStyle: {
-          width: 3
-        },
-        areaStyle: chartType.value === 'line' && showArea.value ? {
-          color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: getColor(index, 0.3) },
-              { offset: 1, color: getColor(index, 0.05) }
-            ]
+    if (!Array.isArray(rows) || rows.length === 0) {
+      xAxis = { type: 'category', data: [] }
+      yAxis = { type: 'value', data: [] }
+      series = []
+    } else {
+        const colHeaders = props.data.headers?.columns || rows[0]?.map((_, i) => `列${i + 1}`) || []
+        const rowHeaders = props.data.headers?.rows || rows.map((_, i) => `行${i + 1}`) || []
+        
+        xAxis = {
+          type: 'category',
+          data: colHeaders,
+          axisLabel: {
+            fontSize: 12,
+            color: '#666'
+          },
+          axisLine: {
+            lineStyle: {
+              color: '#E1E4E8'
+            }
           }
-        } : null
-      }))
-    } else if (chartType.value === 'pie') {
-      const totalPerRow = rows.map((row, index) => ({
-        name: rowHeaders[index] || `行${index + 1}`,
-        value: row.reduce((a, b) => a + (Number(b) || 0), 0)
-      }))
-      pieData = totalPerRow
+        }
+
+        yAxis = {
+          type: 'value',
+          name: props.scene.content.unit || '数值',
+          axisLabel: {
+            fontSize: 12,
+            color: '#666'
+          },
+          axisLine: {
+            lineStyle: {
+              color: '#E1E4E8'
+            }
+          },
+          splitLine: showGrid.value ? {
+            lineStyle: {
+              color: '#F0F0F0',
+              type: 'dashed'
+            }
+          } : { show: false }
+        }
+
+      if (chartType.value === 'bar' || chartType.value === 'line') {
+        series = rows.map((row, index) => ({
+          name: rowHeaders[index] || `行${index + 1}`,
+          type: chartType.value,
+          data: row,
+          smooth: chartType.value === 'line' ? smoothLine.value : undefined,
+          label: showLabel.value ? {
+            show: true,
+            position: 'top',
+            fontSize: 11,
+            color: '#333'
+          } : undefined,
+          itemStyle: {
+            color: getColor(index)
+          },
+          lineStyle: {
+            width: 3
+          },
+          areaStyle: chartType.value === 'line' && showArea.value ? {
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: getColor(index, 0.3) },
+                { offset: 1, color: getColor(index, 0.05) }
+              ]
+            }
+          } : null
+        }))
+      } else if (chartType.value === 'pie') {
+        const totalPerRow = rows.map((row, index) => ({
+          name: rowHeaders[index] || `行${index + 1}`,
+          value: row.reduce((a, b) => a + (Number(b) || 0), 0)
+        }))
+        pieData = totalPerRow
+      }
     }
   } else if (props.data?.type === 'categories') {
     const categories = props.data.data || []
@@ -652,6 +666,13 @@ function convertDataToFlat() {
 
   if (!data) return items
 
+  if (props.viewMode === 'flat') {
+    return data.map(item => ({
+      label: item.label,
+      value: Number(item.value) || 0
+    }))
+  }
+
   if (props.data?.type === 'table') {
     const rowHeaders = props.data.headers?.rows || data.map((_, i) => `行${i + 1}`)
     const colHeaders = props.data.headers?.columns || (data[0]?.map((_, i) => `列${i + 1}`) || [])
@@ -701,9 +722,11 @@ function getAllValues() {
   
   if (props.data?.type === 'table') {
     data.forEach(row => {
-      row.forEach(val => {
-        if (val !== null && val !== undefined && !isNaN(val)) values.push(Number(val))
-      })
+      if (Array.isArray(row)) {
+        row.forEach(val => {
+          if (val !== null && val !== undefined && !isNaN(val)) values.push(Number(val))
+        })
+      }
     })
   } else if (props.data?.type === 'categories') {
     data.forEach(item => {
@@ -742,11 +765,11 @@ function getColor(index, alpha = 1) {
   return colors[index % colors.length]
 }
 
-watch(() => props.data, () => {
+watch(() => props.data, (newData, oldData) => {
   if (chartRef.value) {
     chartRef.value.setOption(chartOption.value, { notMerge: true })
   }
-}, { deep: true })
+}, { deep: true, immediate: true })
 
 watch(chartType, () => {
   if (chartRef.value) {
@@ -765,6 +788,12 @@ watch(() => props.viewMode, () => {
     chartRef.value.setOption(chartOption.value, { notMerge: true })
   }
 })
+
+watch(() => props.data?.headers, () => {
+  if (chartRef.value) {
+    chartRef.value.setOption(chartOption.value, { notMerge: true })
+  }
+}, { deep: true })
 
 function refreshChart() {
   if (isRefreshing.value) return
