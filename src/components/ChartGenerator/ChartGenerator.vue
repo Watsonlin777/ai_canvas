@@ -1,7 +1,12 @@
 <template>
   <div class="chart-generator">
     <div class="chart-header">
-      <h3 class="chart-title">📊 数据可视化</h3>
+      <div class="header-left">
+        <h3 class="chart-title">📊 数据可视化</h3>
+        <button class="btn-toggle" @click="showSettings = !showSettings" :title="showSettings ? '收起设置' : '展开设置'">
+          <span :class="['toggle-icon', { rotated: showSettings }]">▼</span>
+        </button>
+      </div>
       <div class="chart-controls">
         <button 
           :class="['chart-type-btn', { active: chartType === 'bar' }]"
@@ -27,6 +32,47 @@
       </div>
     </div>
     
+    <div class="settings-panel" :class="{ collapsed: !showSettings }">
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label class="setting-label">显示图例</label>
+          <button :class="['toggle-switch', { on: showLegend }]" @click="showLegend = !showLegend">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">显示工具栏</label>
+          <button :class="['toggle-switch', { on: showToolbox }]" @click="showToolbox = !showToolbox">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">平滑曲线</label>
+          <button :class="['toggle-switch', { on: smoothLine }]" @click="smoothLine = !smoothLine">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">显示数据标签</label>
+          <button :class="['toggle-switch', { on: showLabel }]" @click="showLabel = !showLabel">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">显示面积填充</label>
+          <button :class="['toggle-switch', { on: showArea }]" @click="showArea = !showArea">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">显示网格线</label>
+          <button :class="['toggle-switch', { on: showGrid }]" @click="showGrid = !showGrid">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+    
     <div class="chart-container" ref="chartContainer">
       <v-chart 
         ref="chartRef"
@@ -36,7 +82,7 @@
       />
     </div>
     
-    <div class="chart-info">
+    <div class="chart-info" v-if="showChartInfo">
       <div class="info-item">
         <span class="info-label">图表类型</span>
         <span class="info-value">{{ chartTypeNames[chartType] }}</span>
@@ -94,6 +140,15 @@ const chartRef = ref(null)
 const chartContainer = ref(null)
 const chartType = ref('bar')
 
+const showSettings = ref(false)
+const showLegend = ref(true)
+const showToolbox = ref(true)
+const smoothLine = ref(true)
+const showLabel = ref(false)
+const showArea = ref(true)
+const showGrid = ref(true)
+const showChartInfo = ref(true)
+
 const chartTypeNames = {
   bar: '柱状图',
   line: '折线图',
@@ -128,7 +183,7 @@ const chartOption = computed(() => {
       },
       extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px;'
     },
-    toolbox: {
+    toolbox: showToolbox.value ? {
       feature: {
         saveAsImage: {
           title: '保存图片',
@@ -141,7 +196,14 @@ const chartOption = computed(() => {
       },
       right: 20,
       top: 20
-    }
+    } : undefined,
+    legend: showLegend.value ? {
+      top: 10,
+      textStyle: {
+        fontSize: 12,
+        color: '#666'
+      }
+    } : undefined
   }
 
   let series = []
@@ -180,12 +242,12 @@ const chartOption = computed(() => {
           color: '#E1E4E8'
         }
       },
-      splitLine: {
+      splitLine: showGrid.value ? {
         lineStyle: {
           color: '#F0F0F0',
           type: 'dashed'
         }
-      }
+      } : { show: false }
     }
 
     if (chartType.value === 'bar' || chartType.value === 'line') {
@@ -193,14 +255,20 @@ const chartOption = computed(() => {
         name: rowHeaders[index] || `行${index + 1}`,
         type: chartType.value,
         data: row,
-        smooth: chartType.value === 'line',
+        smooth: chartType.value === 'line' ? smoothLine.value : undefined,
+        label: showLabel.value ? {
+          show: true,
+          position: 'top',
+          fontSize: 11,
+          color: '#333'
+        } : undefined,
         itemStyle: {
           color: getColor(index)
         },
         lineStyle: {
           width: 3
         },
-        areaStyle: chartType.value === 'line' ? {
+        areaStyle: chartType.value === 'line' && showArea.value ? {
           color: {
             type: 'linear',
             x: 0,
@@ -253,12 +321,12 @@ const chartOption = computed(() => {
           color: '#E1E4E8'
         }
       },
-      splitLine: {
+      splitLine: showGrid.value ? {
         lineStyle: {
           color: '#F0F0F0',
           type: 'dashed'
         }
-      }
+      } : { show: false }
     }
 
     if (chartType.value === 'bar' || chartType.value === 'line') {
@@ -266,14 +334,15 @@ const chartOption = computed(() => {
         name: props.scene.content.unit || '数量',
         type: chartType.value,
         data: values,
-        smooth: chartType.value === 'line',
+        smooth: chartType.value === 'line' ? smoothLine.value : undefined,
+        label: showLabel.value ? { show: true, position: 'top', fontSize: 11, color: '#333' } : undefined,
         itemStyle: {
           color: props.scene.color || '#4A90E2'
         },
         lineStyle: {
           width: 3
         },
-        areaStyle: chartType.value === 'line' ? {
+        areaStyle: chartType.value === 'line' && showArea.value ? {
           color: {
             type: 'linear',
             x: 0,
@@ -324,12 +393,12 @@ const chartOption = computed(() => {
           color: '#E1E4E8'
         }
       },
-      splitLine: {
+      splitLine: showGrid.value ? {
         lineStyle: {
           color: '#F0F0F0',
           type: 'dashed'
         }
-      }
+      } : { show: false }
     }
 
     if (chartType.value === 'bar' || chartType.value === 'line') {
@@ -337,7 +406,8 @@ const chartOption = computed(() => {
         name: '人数',
         type: chartType.value,
         data: values,
-        smooth: chartType.value === 'line',
+        smooth: chartType.value === 'line' ? smoothLine.value : undefined,
+        label: showLabel.value ? { show: true, position: 'top', fontSize: 11, color: '#333' } : undefined,
         itemStyle: {
           color: props.scene.color || '#9C27B0'
         },
@@ -383,12 +453,12 @@ const chartOption = computed(() => {
           color: '#E1E4E8'
         }
       },
-      splitLine: {
+      splitLine: showGrid.value ? {
         lineStyle: {
           color: '#F0F0F0',
           type: 'dashed'
         }
-      }
+      } : { show: false }
     }
 
     if (chartType.value === 'bar' || chartType.value === 'line') {
@@ -396,14 +466,15 @@ const chartOption = computed(() => {
         name: props.scene.content.unit || '数值',
         type: chartType.value,
         data: values,
-        smooth: chartType.value === 'line',
+        smooth: chartType.value === 'line' ? smoothLine.value : undefined,
+        label: showLabel.value ? { show: true, position: 'top', fontSize: 11, color: '#333' } : undefined,
         itemStyle: {
           color: props.scene.color || '#00BCD4'
         },
         lineStyle: {
           width: 3
         },
-        areaStyle: chartType.value === 'line' ? {
+        areaStyle: chartType.value === 'line' && showArea.value ? {
           color: {
             type: 'linear',
             x: 0,
@@ -542,6 +613,12 @@ watch(chartType, () => {
     chartRef.value.setOption(chartOption.value, { notMerge: true })
   }
 })
+
+watch([showLegend, showToolbox, smoothLine, showLabel, showArea, showGrid], () => {
+  if (chartRef.value) {
+    chartRef.value.setOption(chartOption.value, { notMerge: true })
+  }
+})
 </script>
 
 <style scoped>
@@ -559,6 +636,114 @@ watch(chartType, () => {
   margin-bottom: 20px;
   padding-bottom: 16px;
   border-bottom: 2px solid #E1E4E8;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-toggle {
+  width: 28px;
+  height: 28px;
+  background: #F8F9FA;
+  border: 1px solid #E1E4E8;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.3s ease;
+}
+
+.btn-toggle:hover {
+  background: #E1E4E8;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.toggle-icon.rotated {
+  transform: rotate(0deg);
+}
+
+.settings-panel {
+  overflow: hidden;
+  max-height: 200px;
+  transition: max-height 0.4s ease, opacity 0.3s ease, margin 0.3s ease, padding 0.3s ease;
+  opacity: 1;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, #F8F9FA 0%, #EDE7F6 100%);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #E1E4E8;
+}
+
+.settings-panel.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  padding: 0 16px;
+  border-color: transparent;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+}
+
+.setting-label {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+}
+
+.toggle-switch {
+  width: 40px;
+  height: 22px;
+  background: #D1D5DB;
+  border: none;
+  border-radius: 11px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.3s ease;
+  padding: 0;
+}
+
+.toggle-switch.on {
+  background: #4A90E2;
+}
+
+.toggle-knob {
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.on .toggle-knob {
+  transform: translateX(18px);
 }
 
 .chart-title {

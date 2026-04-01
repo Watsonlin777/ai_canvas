@@ -1,7 +1,12 @@
 <template>
   <div class="editable-data-manager">
     <div class="data-manager-header">
-      <h3 class="section-title">📝 数据编辑</h3>
+      <div class="header-left">
+        <h3 class="section-title">📝 数据编辑</h3>
+        <button class="btn-toggle" @click="showSettings = !showSettings" :title="showSettings ? '收起设置' : '展开设置'">
+          <span :class="['toggle-icon', { rotated: showSettings }]">▼</span>
+        </button>
+      </div>
       <div class="data-actions">
         <button class="btn btn-sm btn-primary" @click="addColumn" v-if="dataType === 'table'">
           ➕ 添加列
@@ -15,7 +20,48 @@
       </div>
     </div>
     
-    <div class="data-description" v-if="scene.content">
+    <div class="settings-panel" :class="{ collapsed: !showSettings }">
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label class="setting-label">显示行标题</label>
+          <button :class="['toggle-switch', { on: showRowHeaders }]" @click="showRowHeaders = !showRowHeaders">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">显示列标题</label>
+          <button :class="['toggle-switch', { on: showColHeaders }]" @click="showColHeaders = !showColHeaders">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">显示数据统计</label>
+          <button :class="['toggle-switch', { on: showStats }]" @click="showStats = !showStats">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">显示数据说明</label>
+          <button :class="['toggle-switch', { on: showDescription }]" @click="showDescription = !showDescription">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">允许删除行</label>
+          <button :class="['toggle-switch', { on: allowDelete }]" @click="allowDelete = !allowDelete">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item">
+          <label class="setting-label">允许删除列</label>
+          <button :class="['toggle-switch', { on: allowDeleteCol }]" @click="allowDeleteCol = !allowDeleteCol">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="data-description" v-if="scene.content && showDescription">
       <div class="description-item">
         <span class="description-icon">📋</span>
         <span class="description-text">{{ getDataDescription() }}</span>
@@ -24,9 +70,9 @@
     
     <div class="data-editor">
       <div v-if="dataType === 'table'" class="table-editor">
-        <div class="column-headers">
+        <div class="column-headers" v-if="showColHeaders">
           <div class="header-row">
-            <div class="corner-cell">
+            <div class="corner-cell" v-if="showRowHeaders">
               <span class="corner-label">行\\列</span>
             </div>
             <div 
@@ -44,7 +90,7 @@
               <button 
                 class="btn-delete-col" 
                 @click="deleteColumn(index)"
-                v-if="tableHeaders.length > 1"
+                v-if="allowDeleteCol && tableHeaders.length > 1"
                 title="删除此列"
               >✕</button>
             </div>
@@ -61,7 +107,7 @@
             <table class="editable-table">
               <tbody>
                 <tr v-for="(row, rowIndex) in editableData.rows" :key="rowIndex">
-                  <td class="row-header-cell">
+                  <td class="row-header-cell" v-if="showRowHeaders">
                     <input 
                       type="text" 
                       class="row-header-input"
@@ -84,7 +130,7 @@
             </table>
           </div>
           
-          <div class="table-actions-row">
+          <div class="table-actions-row" v-if="allowDelete">
             <div class="action-cell" v-for="(row, rowIndex) in editableData.rows" :key="'del-'+rowIndex">
               <button class="btn-delete" @click="deleteRow(rowIndex)" title="删除此行">✕</button>
             </div>
@@ -212,7 +258,7 @@
       </div>
     </div>
     
-    <div class="data-stats">
+    <div class="data-stats" v-if="showStats">
       <div class="stat-item">
         <span class="stat-label">📊 数据量</span>
         <span class="stat-value">{{ dataCount }}</span>
@@ -253,6 +299,14 @@ const dataType = ref('table')
 const valueKey = ref('value')
 const tableHeaders = ref([])
 const rowHeaders = ref([])
+
+const showSettings = ref(false)
+const showRowHeaders = ref(true)
+const showColHeaders = ref(true)
+const showStats = ref(true)
+const showDescription = ref(true)
+const allowDelete = ref(true)
+const allowDeleteCol = ref(true)
 
 const editableData = ref({
   rows: [],
@@ -501,6 +555,114 @@ onMounted(() => {
   margin-bottom: 16px;
   padding-bottom: 16px;
   border-bottom: 2px solid #E1E4E8;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-toggle {
+  width: 28px;
+  height: 28px;
+  background: #F8F9FA;
+  border: 1px solid #E1E4E8;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.3s ease;
+}
+
+.btn-toggle:hover {
+  background: #E1E4E8;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.toggle-icon.rotated {
+  transform: rotate(0deg);
+}
+
+.settings-panel {
+  overflow: hidden;
+  max-height: 200px;
+  transition: max-height 0.4s ease, opacity 0.3s ease, margin 0.3s ease, padding 0.3s ease;
+  opacity: 1;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #F8F9FA 0%, #EDE7F6 100%);
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #E1E4E8;
+}
+
+.settings-panel.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-bottom: 0;
+  padding: 0 16px;
+  border-color: transparent;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+}
+
+.setting-label {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+}
+
+.toggle-switch {
+  width: 40px;
+  height: 22px;
+  background: #D1D5DB;
+  border: none;
+  border-radius: 11px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.3s ease;
+  padding: 0;
+}
+
+.toggle-switch.on {
+  background: #4A90E2;
+}
+
+.toggle-knob {
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.on .toggle-knob {
+  transform: translateX(18px);
 }
 
 .section-title {
