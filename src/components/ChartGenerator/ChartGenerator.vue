@@ -45,12 +45,16 @@
         <span class="info-label">数据系列</span>
         <span class="info-value">{{ seriesCount }}</span>
       </div>
+      <div class="info-item" v-if="dataStats.total">
+        <span class="info-label">数据总量</span>
+        <span class="info-value">{{ dataStats.total }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
@@ -103,6 +107,14 @@ const seriesCount = computed(() => {
   return props.data?.data?.length || 0
 })
 
+const dataStats = computed(() => {
+  const values = getAllValues()
+  if (values.length === 0) return {}
+  
+  const total = values.reduce((a, b) => a + b, 0)
+  return { total }
+})
+
 const chartOption = computed(() => {
   const baseOption = {
     tooltip: {
@@ -120,9 +132,7 @@ const chartOption = computed(() => {
       feature: {
         saveAsImage: {
           title: '保存图片',
-          icon: {
-            saveAsImage: 'image://data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMSAxNXY0YTIgMiAwIDAgMS0yIDJINWEyIDIgMCAwIDEtMi0ydi00Ii8+PHBvbHlsaW5lIHBvaW50cz0iMTcgOSAxMiAxNCA3IDkiLz48bGluZSB4MT0iMTIiIHkxPSIzIiB4Mj0iMTIiIHkyPSIxNSIvPjwvc3ZnPg=='
-          }
+          pixelRatio: 2
         },
         dataView: {
           title: '数据视图',
@@ -141,11 +151,12 @@ const chartOption = computed(() => {
 
   if (props.data?.type === 'table') {
     const rows = props.data.data || []
-    const labels = rows.map((_, i) => `行${i + 1}`)
+    const colHeaders = props.data.headers?.columns || rows[0]?.map((_, i) => `列${i + 1}`) || []
+    const rowHeaders = props.data.headers?.rows || rows.map((_, i) => `行${i + 1}`) || []
     
     xAxis = {
       type: 'category',
-      data: labels,
+      data: colHeaders,
       axisLabel: {
         fontSize: 12,
         color: '#666'
@@ -179,7 +190,7 @@ const chartOption = computed(() => {
 
     if (chartType.value === 'bar' || chartType.value === 'line') {
       series = rows.map((row, index) => ({
-        name: `行${index + 1}`,
+        name: rowHeaders[index] || `行${index + 1}`,
         type: chartType.value,
         data: row,
         smooth: chartType.value === 'line',
@@ -205,8 +216,8 @@ const chartOption = computed(() => {
       }))
     } else if (chartType.value === 'pie') {
       const totalPerRow = rows.map((row, index) => ({
-        name: `行${index + 1}`,
-        value: row.reduce((a, b) => a + b, 0)
+        name: rowHeaders[index] || `行${index + 1}`,
+        value: row.reduce((a, b) => a + (Number(b) || 0), 0)
       }))
       pieData = totalPerRow
     }
@@ -270,8 +281,8 @@ const chartOption = computed(() => {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: props.scene.color + '4D' },
-              { offset: 1, color: props.scene.color + '0D' }
+              { offset: 0, color: (props.scene.color || '#4A90E2') + '4D' },
+              { offset: 1, color: (props.scene.color || '#4A90E2') + '0D' }
             ]
           }
         } : null
@@ -400,8 +411,8 @@ const chartOption = computed(() => {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: props.scene.color + '4D' },
-              { offset: 1, color: props.scene.color + '0D' }
+              { offset: 0, color: (props.scene.color || '#00BCD4') + '4D' },
+              { offset: 1, color: (props.scene.color || '#00BCD4') + '0D' }
             ]
           }
         } : null
@@ -470,6 +481,41 @@ const chartOption = computed(() => {
     series
   }
 })
+
+function getAllValues() {
+  const values = []
+  const data = props.data?.data
+  
+  if (!data) return values
+  
+  if (props.data?.type === 'table') {
+    data.forEach(row => {
+      row.forEach(val => {
+        if (val !== null && val !== undefined && !isNaN(val)) values.push(Number(val))
+      })
+    })
+  } else if (props.data?.type === 'categories') {
+    data.forEach(item => {
+      if (item.amount !== null && item.amount !== undefined && !isNaN(item.amount)) {
+        values.push(Number(item.amount))
+      }
+    })
+  } else if (props.data?.type === 'ranges') {
+    data.forEach(item => {
+      if (item.count !== null && item.count !== undefined && !isNaN(item.count)) {
+        values.push(Number(item.count))
+      }
+    })
+  } else if (props.data?.type === 'daily') {
+    const valueKey = Object.keys(data[0] || {}).find(k => k !== 'day')
+    data.forEach(item => {
+      const val = item[valueKey]
+      if (val !== null && val !== undefined && !isNaN(val)) values.push(Number(val))
+    })
+  }
+  
+  return values
+}
 
 function getColor(index, alpha = 1) {
   const colors = [
