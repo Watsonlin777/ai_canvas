@@ -133,6 +133,10 @@ const props = defineProps({
   scene: {
     type: Object,
     required: true
+  },
+  viewMode: {
+    type: String,
+    default: 'table'
   }
 })
 
@@ -211,7 +215,87 @@ const chartOption = computed(() => {
   let yAxis = null
   let pieData = []
 
-  if (props.data?.type === 'table') {
+  const isFlat = props.viewMode === 'flat'
+
+  if (isFlat) {
+    const flatItems = convertDataToFlat()
+    const labels = flatItems.map(item => item.label)
+    const values = flatItems.map(item => item.value)
+
+    xAxis = {
+      type: 'category',
+      data: labels,
+      axisLabel: {
+        fontSize: 11,
+        color: '#666',
+        rotate: labels.length > 8 ? 30 : 0
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#E1E4E8'
+        }
+      }
+    }
+
+    yAxis = {
+      type: 'value',
+      name: props.scene.content.unit || '数值',
+      axisLabel: {
+        fontSize: 12,
+        color: '#666'
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#E1E4E8'
+        }
+      },
+      splitLine: showGrid.value ? {
+        lineStyle: {
+          color: '#F0F0F0',
+          type: 'dashed'
+        }
+      } : { show: false }
+    }
+
+    if (chartType.value === 'bar' || chartType.value === 'line') {
+      series = [{
+        name: props.scene.content.unit || '数值',
+        type: chartType.value,
+        data: values,
+        smooth: chartType.value === 'line' ? smoothLine.value : undefined,
+        label: showLabel.value ? {
+          show: true,
+          position: 'top',
+          fontSize: 11,
+          color: '#333'
+        } : undefined,
+        itemStyle: {
+          color: props.scene.color || '#4A90E2'
+        },
+        lineStyle: {
+          width: 3
+        },
+        areaStyle: chartType.value === 'line' && showArea.value ? {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: (props.scene.color || '#4A90E2') + '4D' },
+              { offset: 1, color: (props.scene.color || '#4A90E2') + '0D' }
+            ]
+          }
+        } : null
+      }]
+    } else if (chartType.value === 'pie') {
+      pieData = flatItems.map(item => ({
+        name: item.label,
+        value: item.value
+      }))
+    }
+  } else if (props.data?.type === 'table') {
     const rows = props.data.data || []
     const colHeaders = props.data.headers?.columns || rows[0]?.map((_, i) => `列${i + 1}`) || []
     const rowHeaders = props.data.headers?.rows || rows.map((_, i) => `行${i + 1}`) || []
@@ -553,11 +637,58 @@ const chartOption = computed(() => {
   }
 })
 
+function convertDataToFlat() {
+  const items = []
+  const data = props.data?.data
+
+  if (!data) return items
+
+  if (props.data?.type === 'table') {
+    const rowHeaders = props.data.headers?.rows || data.map((_, i) => `行${i + 1}`)
+    const colHeaders = props.data.headers?.columns || (data[0]?.map((_, i) => `列${i + 1}`) || [])
+    data.forEach((row, rowIndex) => {
+      row.forEach((val, colIndex) => {
+        const rowLabel = rowHeaders[rowIndex] || `行${rowIndex + 1}`
+        const colLabel = colHeaders[colIndex] || `列${colIndex + 1}`
+        items.push({
+          label: `${rowLabel}-${colLabel}`,
+          value: Number(val) || 0
+        })
+      })
+    })
+  } else if (props.data?.type === 'categories') {
+    data.forEach(item => {
+      items.push({ label: item.name, value: Number(item.amount) || 0 })
+    })
+  } else if (props.data?.type === 'ranges') {
+    data.forEach(item => {
+      items.push({ label: item.range, value: Number(item.count) || 0 })
+    })
+  } else if (props.data?.type === 'daily') {
+    const valueKey = Object.keys(data[0] || {}).find(k => k !== 'day')
+    data.forEach(item => {
+      items.push({ label: item.day, value: Number(item[valueKey]) || 0 })
+    })
+  }
+
+  return items
+}
+
 function getAllValues() {
   const values = []
   const data = props.data?.data
   
   if (!data) return values
+
+  if (props.viewMode === 'flat') {
+    const flatItems = convertDataToFlat()
+    flatItems.forEach(item => {
+      if (item.value !== null && item.value !== undefined && !isNaN(item.value)) {
+        values.push(Number(item.value))
+      }
+    })
+    return values
+  }
   
   if (props.data?.type === 'table') {
     data.forEach(row => {
@@ -615,6 +746,12 @@ watch(chartType, () => {
 })
 
 watch([showLegend, showToolbox, smoothLine, showLabel, showArea, showGrid], () => {
+  if (chartRef.value) {
+    chartRef.value.setOption(chartOption.value, { notMerge: true })
+  }
+})
+
+watch(() => props.viewMode, () => {
   if (chartRef.value) {
     chartRef.value.setOption(chartOption.value, { notMerge: true })
   }

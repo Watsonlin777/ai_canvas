@@ -15,6 +15,7 @@
         <EditableData 
           :scene="currentScene" 
           @dataChange="handleDataChange" 
+          @viewModeChange="handleViewModeChange"
         />
         
         <div class="questions-section">
@@ -48,7 +49,8 @@
       <div class="right-panel">
         <ChartGenerator 
           :data="chartData" 
-          :scene="currentScene" 
+          :scene="currentScene"
+          :viewMode="viewMode"
         />
       </div>
     </div>
@@ -83,10 +85,15 @@ const chartData = ref({
   type: 'table',
   data: []
 })
+const viewMode = ref('table')
 
 function handleDataChange(updatedData) {
   chartData.value = updatedData
   autoSave()
+}
+
+function handleViewModeChange(mode) {
+  viewMode.value = mode
 }
 
 function autoSave() {

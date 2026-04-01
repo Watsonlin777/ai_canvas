@@ -58,6 +58,12 @@
             <span class="toggle-knob"></span>
           </button>
         </div>
+        <div class="setting-item" v-if="dataType === 'table'">
+          <label class="setting-label">视图切换按钮</label>
+          <button :class="['toggle-switch', { on: showViewSwitch }]" @click="showViewSwitch = !showViewSwitch">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
       </div>
     </div>
     
@@ -70,79 +76,140 @@
     
     <div class="data-editor">
       <div v-if="dataType === 'table'" class="table-editor">
-        <div class="column-headers" v-if="showColHeaders">
-          <div class="header-row">
-            <div class="corner-cell" v-if="showRowHeaders">
-              <span class="corner-label">行\\列</span>
-            </div>
-            <div 
-              v-for="(header, index) in tableHeaders" 
-              :key="index" 
-              class="header-cell"
-            >
-              <input 
-                type="text" 
-                class="header-input"
-                v-model="tableHeaders[index]"
-                @input="handleDataChange"
-                :placeholder="`列${index + 1}`"
-              />
-              <button 
-                class="btn-delete-col" 
-                @click="deleteColumn(index)"
-                v-if="allowDeleteCol && tableHeaders.length > 1"
-                title="删除此列"
-              >✕</button>
-            </div>
-            <div class="add-column-cell">
-              <button class="btn-add-column" @click="addColumn" title="添加新列">
-                +
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        <div class="table-with-actions">
-          <div class="table-wrapper">
-            <table class="editable-table">
-              <tbody>
-                <tr v-for="(row, rowIndex) in editableData.rows" :key="rowIndex">
-                  <td class="row-header-cell" v-if="showRowHeaders">
-                    <input 
-                      type="text" 
-                      class="row-header-input"
-                      v-model="rowHeaders[rowIndex]"
-                      @input="handleDataChange"
-                      :placeholder="`行${rowIndex + 1}`"
-                    />
-                  </td>
-                  <td v-for="(cell, colIndex) in row" :key="colIndex" class="data-cell">
-                    <input 
-                      type="number" 
-                      class="cell-input"
-                      v-model.number="editableData.rows[rowIndex][colIndex]"
-                      @input="handleDataChange"
-                      :placeholder="getPlaceholder(rowIndex, colIndex)"
-                    />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          
-          <div class="table-actions-row" v-if="allowDelete">
-            <div class="action-cell" v-for="(row, rowIndex) in editableData.rows" :key="'del-'+rowIndex">
-              <button class="btn-delete" @click="deleteRow(rowIndex)" title="删除此行">✕</button>
-            </div>
-          </div>
-        </div>
-        
-        <div class="add-row-section">
-          <button class="btn-add-row" @click="addRow">
-            <span class="add-icon">+</span>
-            <span class="add-text">添加新行</span>
+        <div class="view-mode-switch" v-if="showViewSwitch">
+          <button 
+            :class="['mode-btn', { active: viewMode === 'table' }]" 
+            @click="switchViewMode('table')"
+          >
+            📋 表格视图
+          </button>
+          <button 
+            :class="['mode-btn', { active: viewMode === 'flat' }]" 
+            @click="switchViewMode('flat')"
+          >
+            📑 平铺视图
           </button>
         </div>
+
+        <template v-if="viewMode === 'table'">
+          <div class="column-headers" v-if="showColHeaders">
+            <div class="header-row">
+              <div class="corner-cell" v-if="showRowHeaders">
+                <span class="corner-label">行\\列</span>
+              </div>
+              <div 
+                v-for="(header, index) in tableHeaders" 
+                :key="index" 
+                class="header-cell"
+              >
+                <input 
+                  type="text" 
+                  class="header-input"
+                  v-model="tableHeaders[index]"
+                  @input="handleDataChange"
+                  :placeholder="`列${index + 1}`"
+                />
+                <button 
+                  class="btn-delete-col" 
+                  @click="deleteColumn(index)"
+                  v-if="allowDeleteCol && tableHeaders.length > 1"
+                  title="删除此列"
+                >✕</button>
+              </div>
+              <div class="add-column-cell">
+                <button class="btn-add-column" @click="addColumn" title="添加新列">
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="table-with-actions">
+            <div class="table-wrapper">
+              <table class="editable-table">
+                <tbody>
+                  <tr v-for="(row, rowIndex) in editableData.rows" :key="rowIndex">
+                    <td class="row-header-cell" v-if="showRowHeaders">
+                      <input 
+                        type="text" 
+                        class="row-header-input"
+                        v-model="rowHeaders[rowIndex]"
+                        @input="handleDataChange"
+                        :placeholder="`行${rowIndex + 1}`"
+                      />
+                    </td>
+                    <td v-for="(cell, colIndex) in row" :key="colIndex" class="data-cell">
+                      <input 
+                        type="number" 
+                        class="cell-input"
+                        v-model.number="editableData.rows[rowIndex][colIndex]"
+                        @input="handleDataChange"
+                        :placeholder="getPlaceholder(rowIndex, colIndex)"
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <div class="table-actions-row" v-if="allowDelete">
+              <div class="action-cell" v-for="(row, rowIndex) in editableData.rows" :key="'del-'+rowIndex">
+                <button class="btn-delete" @click="deleteRow(rowIndex)" title="删除此行">✕</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="add-row-section">
+            <button class="btn-add-row" @click="addRow">
+              <span class="add-icon">+</span>
+              <span class="add-text">添加新行</span>
+            </button>
+          </div>
+        </template>
+
+        <template v-else-if="viewMode === 'flat'">
+          <div class="flat-editor">
+            <div class="flat-header-row">
+              <div class="flat-header-label">序号</div>
+              <div class="flat-header-label">标签</div>
+              <div class="flat-header-label">数值</div>
+              <div class="flat-header-label" v-if="allowDelete">操作</div>
+            </div>
+            <div 
+              v-for="(item, index) in flatData" 
+              :key="index" 
+              class="flat-row"
+              :class="{ 'flat-row-alt': index % 2 === 0 }"
+            >
+              <div class="flat-cell flat-index">{{ index + 1 }}</div>
+              <div class="flat-cell flat-label-cell">
+                <input 
+                  type="text" 
+                  class="input-field flat-input"
+                  v-model="flatData[index].label"
+                  @input="handleFlatDataChange"
+                  placeholder="输入标签"
+                />
+              </div>
+              <div class="flat-cell flat-value-cell">
+                <input 
+                  type="number" 
+                  class="input-field flat-input"
+                  v-model.number="flatData[index].value"
+                  @input="handleFlatDataChange"
+                  placeholder="输入数值"
+                />
+              </div>
+              <div class="flat-cell flat-action-cell" v-if="allowDelete">
+                <button class="btn-delete-round" @click="deleteFlatItem(index)" title="删除此项">✕</button>
+              </div>
+            </div>
+            <button class="btn-add-item" @click="addFlatItem">
+              <span class="add-icon">+</span>
+              <span class="add-text">添加新数据项</span>
+            </button>
+          </div>
+        </template>
       </div>
       
       <div v-else-if="dataType === 'categories'" class="categories-editor">
@@ -293,7 +360,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['dataChange'])
+const emit = defineEmits(['dataChange', 'viewModeChange'])
 
 const dataType = ref('table')
 const valueKey = ref('value')
@@ -307,6 +374,9 @@ const showStats = ref(true)
 const showDescription = ref(true)
 const allowDelete = ref(true)
 const allowDeleteCol = ref(true)
+const showViewSwitch = ref(true)
+const viewMode = ref('table')
+const flatData = ref([])
 
 const editableData = ref({
   rows: [],
@@ -524,6 +594,93 @@ function deleteDaily(index) {
   }
 }
 
+function switchViewMode(mode) {
+  if (mode === 'flat') {
+    convertToFlat()
+  }
+  viewMode.value = mode
+  emit('viewModeChange', mode)
+}
+
+function convertToFlat() {
+  const items = []
+  if (dataType.value === 'table') {
+    editableData.value.rows.forEach((row, rowIndex) => {
+      row.forEach((val, colIndex) => {
+        const rowLabel = rowHeaders.value[rowIndex] || `行${rowIndex + 1}`
+        const colLabel = tableHeaders.value[colIndex] || `列${colIndex + 1}`
+        items.push({
+          label: `${rowLabel}-${colLabel}`,
+          value: val || 0
+        })
+      })
+    })
+  } else if (dataType.value === 'categories') {
+    editableData.value.categories.forEach(item => {
+      items.push({ label: item.name, value: item.amount })
+    })
+  } else if (dataType.value === 'ranges') {
+    editableData.value.ranges.forEach(item => {
+      items.push({ label: item.range, value: item.count })
+    })
+  } else if (dataType.value === 'daily') {
+    editableData.value.data.forEach(item => {
+      const val = item[valueKey.value]
+      items.push({ label: item.day, value: val })
+    })
+  }
+  flatData.value = items
+}
+
+function convertFromFlat() {
+  if (dataType.value === 'table') {
+    const maxCols = tableHeaders.value.length
+    const numRows = Math.ceil(flatData.value.length / maxCols)
+    const newRows = []
+    for (let r = 0; r < numRows; r++) {
+      const row = []
+      for (let c = 0; c < maxCols; c++) {
+        const flatIndex = r * maxCols + c
+        row.push(flatData.value[flatIndex] ? flatData.value[flatIndex].value : 0)
+      }
+      newRows.push(row)
+    }
+    editableData.value.rows = newRows
+  } else if (dataType.value === 'categories') {
+    editableData.value.categories = flatData.value.map(item => ({
+      name: item.label,
+      amount: item.value
+    }))
+  } else if (dataType.value === 'ranges') {
+    editableData.value.ranges = flatData.value.map(item => ({
+      range: item.label,
+      count: item.value
+    }))
+  } else if (dataType.value === 'daily') {
+    editableData.value.data = flatData.value.map(item => ({
+      day: item.label,
+      [valueKey.value]: item.value
+    }))
+  }
+}
+
+function handleFlatDataChange() {
+  convertFromFlat()
+  handleDataChange()
+}
+
+function addFlatItem() {
+  flatData.value.push({ label: '新数据', value: 0 })
+  handleFlatDataChange()
+}
+
+function deleteFlatItem(index) {
+  if (flatData.value.length > 1) {
+    flatData.value.splice(index, 1)
+    handleFlatDataChange()
+  }
+}
+
 function resetData() {
   if (confirm('确定要重置为原始数据吗？所有修改将丢失。')) {
     loadData()
@@ -663,6 +820,141 @@ onMounted(() => {
 
 .toggle-switch.on .toggle-knob {
   transform: translateX(18px);
+}
+
+.view-mode-switch {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: #F0F0F0;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.mode-btn:hover {
+  color: #333;
+  background: rgba(74, 144, 226, 0.1);
+}
+
+.mode-btn.active {
+  background: white;
+  color: #4A90E2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+}
+
+.flat-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flat-header-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+}
+
+.flat-header-label {
+  flex: 1;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.flat-header-label:first-child {
+  width: 48px;
+  flex: none;
+  border-radius: 6px 0 0 0;
+}
+
+.flat-header-label:last-child {
+  width: 44px;
+  flex: none;
+  border-radius: 0 6px 0 0;
+}
+
+.flat-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  transition: background 0.2s ease;
+}
+
+.flat-row:hover {
+  background: #E3F2FD;
+}
+
+.flat-row-alt {
+  background: #F8F9FA;
+}
+
+.flat-row-alt:hover {
+  background: #E3F2FD;
+}
+
+.flat-cell {
+  padding: 0;
+}
+
+.flat-index {
+  width: 48px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #999;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.flat-label-cell {
+  flex: 1;
+}
+
+.flat-value-cell {
+  flex: 1;
+}
+
+.flat-input {
+  width: 100%;
+  height: 44px;
+  border: none;
+  border-radius: 0;
+  font-size: 14px;
+  padding: 0 12px;
+}
+
+.flat-input:focus {
+  outline: none;
+  background: #E3F2FD;
+  box-shadow: inset 0 0 0 2px #4A90E2;
+}
+
+.flat-action-cell {
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .section-title {
