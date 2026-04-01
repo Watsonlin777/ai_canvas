@@ -29,6 +29,14 @@
         >
           🥧
         </button>
+        <button 
+          class="chart-type-btn btn-refresh"
+          :class="{ refreshing: isRefreshing }"
+          @click="refreshChart"
+          title="刷新图表"
+        >
+          🔄
+        </button>
       </div>
     </div>
     
@@ -100,7 +108,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
@@ -152,6 +160,7 @@ const showLabel = ref(false)
 const showArea = ref(true)
 const showGrid = ref(true)
 const showChartInfo = ref(true)
+const isRefreshing = ref(false)
 
 const chartTypeNames = {
   bar: '柱状图',
@@ -756,6 +765,19 @@ watch(() => props.viewMode, () => {
     chartRef.value.setOption(chartOption.value, { notMerge: true })
   }
 })
+
+function refreshChart() {
+  if (isRefreshing.value) return
+  isRefreshing.value = true
+
+  if (chartRef.value) {
+    chartRef.value.setOption(chartOption.value, { notMerge: true })
+  }
+
+  setTimeout(() => {
+    isRefreshing.value = false
+  }, 600)
+}
 </script>
 
 <style scoped>
@@ -915,6 +937,24 @@ watch(() => props.viewMode, () => {
   background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
   border-color: #4A90E2;
   box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+}
+
+.btn-refresh {
+  transition: all 0.3s ease;
+}
+
+.btn-refresh:hover {
+  border-color: #4CAF50;
+  transform: translateY(-2px);
+}
+
+.btn-refresh.refreshing {
+  animation: spin 0.6s ease;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .chart-container {
