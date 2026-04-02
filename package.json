@@ -1,7 +1,7 @@
 {
   "name": "ai-canvas",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "electron/main.js",
   "author": "WFS老师",
   "description": "AI 数学可视化工具 - 小学数学折线统计图教学神器",

@@ -30,7 +30,7 @@ function createWindow() {
   }
 
   mainWindow.on('closed', () => {
-    mainWindow = null
+    // mainWindow 会被 JavaScript 垃圾回收机制自动清理
   })
 
   const template = [
