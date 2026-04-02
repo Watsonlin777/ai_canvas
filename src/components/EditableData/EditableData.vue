@@ -1163,16 +1163,21 @@ onMounted(() => {
   align-items: center;
   gap: 2px;
   padding: 0;
+  height: 44px;
 }
 
 .flat-header-label {
   flex: 1;
+  height: 44px;
   padding: 10px 12px;
   background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
   color: white;
   font-size: 13px;
   font-weight: 600;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .flat-header-label:first-child {
@@ -1192,6 +1197,7 @@ onMounted(() => {
   align-items: center;
   gap: 2px;
   transition: background 0.2s ease;
+  height: 44px;
 }
 
 .flat-row:hover {
@@ -1224,10 +1230,12 @@ onMounted(() => {
 
 .flat-label-cell {
   flex: 1;
+  height: 44px;
 }
 
 .flat-value-cell {
   flex: 1;
+  height: 44px;
 }
 
 .flat-input {
