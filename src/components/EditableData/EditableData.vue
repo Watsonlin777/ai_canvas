@@ -928,7 +928,15 @@ function applyPredictionToData() {
   
   const predictions = predictionResult.value.predictions
   
-  if (dataType.value === 'table') {
+  if (viewMode.value === 'flat') {
+    predictions.forEach((value, index) => {
+      flatData.value.push({
+        label: `预测${index + 1}`,
+        value: value
+      })
+    })
+    convertFromFlat()
+  } else if (dataType.value === 'table') {
     predictions.forEach((value, index) => {
       const rowIndex = editableData.value.rows.length
       const newRow = new Array(tableHeaders.value.length).fill(0)
