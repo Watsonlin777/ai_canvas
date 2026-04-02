@@ -78,11 +78,32 @@
             <span class="toggle-knob"></span>
           </button>
         </div>
+        <div class="setting-item">
+          <label class="setting-label">启用拖拽编辑</label>
+          <button :class="['toggle-switch', { on: enableDrag }]" @click="enableDrag = !enableDrag">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+        <div class="setting-item" v-if="enableDrag">
+          <label class="setting-label">边缘警告提示</label>
+          <button :class="['toggle-switch', { on: showEdgeWarning }]" @click="showEdgeWarning = !showEdgeWarning">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
+      </div>
+      
+      <div class="drag-hint" v-if="enableDrag">
+        <div class="hint-icon">💡</div>
+        <div class="hint-text">
+          <div class="hint-title">拖拽编辑提示</div>
+          <div class="hint-desc">点击并拖动图表数据点可实时修改数值，支持鼠标和触控操作</div>
+        </div>
       </div>
     </div>
     
     <div class="chart-container" ref="chartContainer">
       <v-chart 
+        v-if="chartReady"
         ref="chartRef"
         :option="chartOption" 
         :autoresize="true"
@@ -167,10 +188,17 @@ const showArea = ref(true)
 const showGrid = ref(true)
 const showChartInfo = ref(true)
 const isRefreshing = ref(false)
+const enableDrag = ref(true)
+const showEdgeWarning = ref(true)
+const chartReady = ref(false)
 
 const dragIndex = ref(-1)
 const dragValue = ref(null)
 let dragFeedback = null
+
+const getSceneUnit = () => props.scene?.content?.unit || '数值'
+const getSceneTitle = () => props.scene?.content?.title || '数据分布'
+const getSceneColor = () => props.scene?.color || '#4A90E2'
 
 const chartTypeNames = {
   bar: '柱状图',
@@ -264,7 +292,7 @@ const chartOption = computed(() => {
 
         yAxis = {
           type: 'value',
-          name: props.scene.content.unit || '数值',
+          name: getSceneUnit(),
           axisLabel: {
             fontSize: 12,
             color: '#666'
@@ -284,7 +312,7 @@ const chartOption = computed(() => {
 
       if (chartType.value === 'bar' || chartType.value === 'line') {
         series = [{
-          name: props.scene.content.unit || '数值',
+          name: getSceneUnit(),
           type: chartType.value,
           data: values,
           smooth: chartType.value === 'line' ? smoothLine.value : undefined,
@@ -295,7 +323,7 @@ const chartOption = computed(() => {
             color: '#333'
           } : undefined,
           itemStyle: {
-            color: props.scene.color || '#4A90E2'
+            color: getSceneColor()
           },
           lineStyle: {
             width: 3
@@ -308,8 +336,8 @@ const chartOption = computed(() => {
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: (props.scene.color || '#4A90E2') + '4D' },
-                { offset: 1, color: (props.scene.color || '#4A90E2') + '0D' }
+                { offset: 0, color: getSceneColor() + '4D' },
+                { offset: 1, color: getSceneColor() + '0D' }
               ]
             }
           } : null
@@ -348,7 +376,7 @@ const chartOption = computed(() => {
 
         yAxis = {
           type: 'value',
-          name: props.scene.content.unit || '数值',
+          name: getSceneUnit(),
           axisLabel: {
             fontSize: 12,
             color: '#666'
@@ -428,7 +456,7 @@ const chartOption = computed(() => {
 
     yAxis = {
       type: 'value',
-      name: props.scene.content.unit || '数量',
+      name: getSceneUnit(),
       axisLabel: {
         fontSize: 12,
         color: '#666'
@@ -448,13 +476,13 @@ const chartOption = computed(() => {
 
     if (chartType.value === 'bar' || chartType.value === 'line') {
       series = [{
-        name: props.scene.content.unit || '数量',
+        name: getSceneUnit(),
         type: chartType.value,
         data: values,
         smooth: chartType.value === 'line' ? smoothLine.value : undefined,
         label: showLabel.value ? { show: true, position: 'top', fontSize: 11, color: '#333' } : undefined,
         itemStyle: {
-          color: props.scene.color || '#4A90E2'
+          color: getSceneColor()
         },
         lineStyle: {
           width: 3
@@ -467,8 +495,8 @@ const chartOption = computed(() => {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: (props.scene.color || '#4A90E2') + '4D' },
-              { offset: 1, color: (props.scene.color || '#4A90E2') + '0D' }
+              { offset: 0, color: getSceneColor() + '4D' },
+              { offset: 1, color: getSceneColor() + '0D' }
             ]
           }
         } : null
@@ -526,7 +554,7 @@ const chartOption = computed(() => {
         smooth: chartType.value === 'line' ? smoothLine.value : undefined,
         label: showLabel.value ? { show: true, position: 'top', fontSize: 11, color: '#333' } : undefined,
         itemStyle: {
-          color: props.scene.color || '#9C27B0'
+          color: getSceneColor()
         },
         lineStyle: {
           width: 3
@@ -560,7 +588,7 @@ const chartOption = computed(() => {
 
     yAxis = {
       type: 'value',
-      name: props.scene.content.unit || '数值',
+      name: getSceneUnit(),
       axisLabel: {
         fontSize: 12,
         color: '#666'
@@ -580,13 +608,13 @@ const chartOption = computed(() => {
 
     if (chartType.value === 'bar' || chartType.value === 'line') {
       series = [{
-        name: props.scene.content.unit || '数值',
+        name: getSceneUnit(),
         type: chartType.value,
         data: values,
         smooth: chartType.value === 'line' ? smoothLine.value : undefined,
         label: showLabel.value ? { show: true, position: 'top', fontSize: 11, color: '#333' } : undefined,
         itemStyle: {
-          color: props.scene.color || '#00BCD4'
+          color: getSceneColor()
         },
         lineStyle: {
           width: 3
@@ -599,8 +627,8 @@ const chartOption = computed(() => {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: (props.scene.color || '#00BCD4') + '4D' },
-              { offset: 1, color: (props.scene.color || '#00BCD4') + '0D' }
+              { offset: 0, color: getSceneColor() + '4D' },
+              { offset: 1, color: getSceneColor() + '0D' }
             ]
           }
         } : null
@@ -614,6 +642,9 @@ const chartOption = computed(() => {
   }
 
   if (chartType.value === 'pie') {
+    if (!pieData || pieData.length === 0) {
+      pieData = [{ name: '暂无数据', value: 1 }]
+    }
     return {
       ...baseOption,
       tooltip: {
@@ -630,7 +661,7 @@ const chartOption = computed(() => {
         }
       },
       series: [{
-        name: props.scene.content.title || '数据分布',
+        name: props.scene?.content?.title || '数据分布',
         type: 'pie',
         radius: ['40%', '70%'],
         center: ['60%', '50%'],
@@ -653,6 +684,20 @@ const chartOption = computed(() => {
         }
       }]
     }
+  }
+
+  if (!series || series.length === 0) {
+    series = [{
+      type: chartType.value || 'bar',
+      data: []
+    }]
+  }
+
+  if (!xAxis) {
+    xAxis = { type: 'category', data: [] }
+  }
+  if (!yAxis) {
+    yAxis = { type: 'value' }
   }
 
   return {
@@ -775,44 +820,9 @@ function getColor(index, alpha = 1) {
   return colors[index % colors.length]
 }
 
-watch(() => props.data, (newData, oldData) => {
-  if (chartRef.value) {
-    chartRef.value.setOption(chartOption.value, { notMerge: true })
-  }
-}, { deep: true, immediate: true })
-
-watch(chartType, () => {
-  if (chartRef.value) {
-    chartRef.value.setOption(chartOption.value, { notMerge: true })
-  }
-})
-
-watch([showLegend, showToolbox, smoothLine, showLabel, showArea, showGrid], () => {
-  if (chartRef.value) {
-    chartRef.value.setOption(chartOption.value, { notMerge: true })
-  }
-})
-
-watch(() => props.viewMode, () => {
-  if (chartRef.value) {
-    chartRef.value.setOption(chartOption.value, { notMerge: true })
-  }
-})
-
-watch(() => props.data?.headers, () => {
-  if (chartRef.value) {
-    chartRef.value.setOption(chartOption.value, { notMerge: true })
-  }
-}, { deep: true })
-
 function refreshChart() {
   if (isRefreshing.value) return
   isRefreshing.value = true
-
-  if (chartRef.value) {
-    chartRef.value.setOption(chartOption.value, { notMerge: true })
-  }
-
   setTimeout(() => {
     isRefreshing.value = false
   }, 600)
@@ -828,6 +838,7 @@ function handleChartClick(params) {
 }
 
 function handleMouseDown(params) {
+  if (!enableDrag.value) return
   if (params.componentType !== 'series') return
   if (chartType.value === 'pie') return
   
@@ -840,7 +851,8 @@ function handleMouseDown(params) {
   if (!dragFeedback && chartContainer.value) {
     dragFeedback = createDragFeedback(chartContainer.value, {
       formatValue: (val) => val.toFixed(1),
-      offset: 15
+      offset: 15,
+      showEdgeWarning: showEdgeWarning.value
     })
   }
   
@@ -848,36 +860,40 @@ function handleMouseDown(params) {
     if (dragIndex.value < 0 || !chartContainer.value) return
     
     const rect = chartContainer.value.getBoundingClientRect()
-    const chartInstance = chartRef.value
+    const chartInstance = chartRef.value?.chart
     
     if (!chartInstance) return
     
-    const model = chartInstance.getModel()
-    const grid = model.getComponent('grid')
-    if (!grid) return
-    
-    const gridRect = grid.coordinateSystem.getArea()
-    const yAxis = model.getComponent('yAxis')
-    if (!yAxis) return
-    
-    const extent = yAxis.axis.getExtent()
-    const maxValue = extent[1]
-    const minValue = extent[0]
-    
-    const relativeY = e.clientY - rect.top - gridRect.y
-    const chartHeight = gridRect.height
-    
-    const ratio = 1 - (relativeY / chartHeight)
-    const newValue = Math.round(minValue + ratio * (maxValue - minValue))
-    const clampedValue = Math.max(minValue, Math.min(maxValue, newValue))
-    
-    updateDataValue(dragIndex.value, clampedValue)
-    
-    if (dragFeedback) {
-      const point = chartInstance.convertToPixel({ seriesIndex: 0 }, [dragIndex.value, clampedValue])
-      if (point) {
-        dragFeedback.update(clampedValue, point[0], point[1])
+    try {
+      const model = chartInstance.getModel()
+      const grid = model.getComponent('grid')
+      if (!grid || !grid.coordinateSystem || typeof grid.coordinateSystem.getArea !== 'function') return
+      
+      const gridRect = grid.coordinateSystem.getArea()
+      const yAxis = model.getComponent('yAxis')
+      if (!yAxis || !yAxis.axis) return
+      
+      const extent = yAxis.axis.getExtent()
+      const maxValue = extent[1]
+      const minValue = extent[0]
+      
+      const relativeY = e.clientY - rect.top - gridRect.y
+      const chartHeight = gridRect.height
+      
+      const ratio = 1 - (relativeY / chartHeight)
+      const newValue = Math.round(minValue + ratio * (maxValue - minValue))
+      const clampedValue = Math.max(minValue, Math.min(maxValue, newValue))
+      
+      updateDataValue(dragIndex.value, clampedValue)
+      
+      if (dragFeedback) {
+        const point = chartInstance.convertToPixel({ seriesIndex: 0 }, [dragIndex.value, clampedValue])
+        if (point) {
+          dragFeedback.update(clampedValue, point[0], point[1], minValue, maxValue)
+        }
       }
+    } catch (error) {
+      console.warn('handleMouseMove error:', error)
     }
   }
   
@@ -896,6 +912,7 @@ function handleMouseDown(params) {
 }
 
 function handleTouchStart(params) {
+  if (!enableDrag.value) return
   if (params.componentType !== 'series') return
   if (chartType.value === 'pie') return
   
@@ -908,7 +925,8 @@ function handleTouchStart(params) {
   if (!dragFeedback && chartContainer.value) {
     dragFeedback = createDragFeedback(chartContainer.value, {
       formatValue: (val) => val.toFixed(1),
-      offset: 15
+      offset: 15,
+      showEdgeWarning: showEdgeWarning.value
     })
   }
   
@@ -923,36 +941,40 @@ function handleTouchStart(params) {
     e.preventDefault()
     
     const rect = chartContainer.value.getBoundingClientRect()
-    const chartInstance = chartRef.value
+    const chartInstance = chartRef.value?.chart
     
     if (!chartInstance) return
     
-    const model = chartInstance.getModel()
-    const grid = model.getComponent('grid')
-    if (!grid) return
-    
-    const gridRect = grid.coordinateSystem.getArea()
-    const yAxis = model.getComponent('yAxis')
-    if (!yAxis) return
-    
-    const extent = yAxis.axis.getExtent()
-    const maxValue = extent[1]
-    const minValue = extent[0]
-    
-    const relativeY = touch.clientY - rect.top - gridRect.y
-    const chartHeight = gridRect.height
-    
-    const ratio = 1 - (relativeY / chartHeight)
-    const newValue = Math.round(minValue + ratio * (maxValue - minValue))
-    const clampedValue = Math.max(minValue, Math.min(maxValue, newValue))
-    
-    updateDataValue(dragIndex.value, clampedValue)
-    
-    if (dragFeedback) {
-      const point = chartInstance.convertToPixel({ seriesIndex: 0 }, [dragIndex.value, clampedValue])
-      if (point) {
-        dragFeedback.update(clampedValue, point[0], point[1])
+    try {
+      const model = chartInstance.getModel()
+      const grid = model.getComponent('grid')
+      if (!grid || !grid.coordinateSystem || typeof grid.coordinateSystem.getArea !== 'function') return
+      
+      const gridRect = grid.coordinateSystem.getArea()
+      const yAxis = model.getComponent('yAxis')
+      if (!yAxis || !yAxis.axis) return
+      
+      const extent = yAxis.axis.getExtent()
+      const maxValue = extent[1]
+      const minValue = extent[0]
+      
+      const relativeY = touch.clientY - rect.top - gridRect.y
+      const chartHeight = gridRect.height
+      
+      const ratio = 1 - (relativeY / chartHeight)
+      const newValue = Math.round(minValue + ratio * (maxValue - minValue))
+      const clampedValue = Math.max(minValue, Math.min(maxValue, newValue))
+      
+      updateDataValue(dragIndex.value, clampedValue)
+      
+      if (dragFeedback) {
+        const point = chartInstance.convertToPixel({ seriesIndex: 0 }, [dragIndex.value, clampedValue])
+        if (point) {
+          dragFeedback.update(clampedValue, point[0], point[1], minValue, maxValue)
+        }
       }
+    } catch (error) {
+      console.warn('handleTouchMove error:', error)
     }
   }
   
@@ -1007,18 +1029,34 @@ function updateDataValue(index, value) {
 }
 
 onMounted(() => {
+  chartReady.value = true
   if (chartContainer.value) {
     dragFeedback = createDragFeedback(chartContainer.value, {
       formatValue: (val) => val.toFixed(1),
-      offset: 15
+      offset: 15,
+      showEdgeWarning: showEdgeWarning.value
     })
   }
 })
 
 onBeforeUnmount(() => {
+  chartReady.value = false
   if (dragFeedback) {
     dragFeedback.hide()
     dragFeedback = null
+  }
+})
+
+watch(showEdgeWarning, (newValue) => {
+  if (chartContainer.value) {
+    if (dragFeedback) {
+      dragFeedback.hide()
+    }
+    dragFeedback = createDragFeedback(chartContainer.value, {
+      formatValue: (val) => val.toFixed(1),
+      offset: 15,
+      showEdgeWarning: newValue
+    })
   }
 })
 </script>
@@ -1077,7 +1115,7 @@ onBeforeUnmount(() => {
 
 .settings-panel {
   overflow: hidden;
-  max-height: 200px;
+  max-height: 400px;
   transition: max-height 0.4s ease, opacity 0.3s ease, margin 0.3s ease, padding 0.3s ease;
   opacity: 1;
   margin-bottom: 20px;
@@ -1230,5 +1268,38 @@ onBeforeUnmount(() => {
   font-size: 16px;
   color: #4A90E2;
   font-weight: 600;
+}
+
+.drag-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+  border-radius: 8px;
+  margin-top: 12px;
+  border: 1px solid #90CAF9;
+}
+
+.hint-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.hint-text {
+  flex: 1;
+}
+
+.hint-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1976D2;
+  margin-bottom: 4px;
+}
+
+.hint-desc {
+  font-size: 12px;
+  color: #1565C0;
+  line-height: 1.5;
 }
 </style>

@@ -97,8 +97,12 @@ export function useChartDrag(options = {}) {
     try {
       const model = chartInstance.getModel()
       const grid = model.getComponent('grid')
+      if (!grid || !grid.coordinateSystem || typeof grid.coordinateSystem.getArea !== 'function') return null
+      
       const gridRect = grid.coordinateSystem.getArea()
       const yAxis = model.getComponent('yAxis')
+      if (!yAxis || !yAxis.axis) return null
+      
       const extent = yAxis.axis.getExtent()
       
       return {
@@ -187,17 +191,140 @@ export function createDragFeedback(container, options = {}) {
     formatValue = (val) => val.toFixed(1),
     position = 'top',
     offset = 10,
-    duration = 200
+    duration = 200,
+    edgeThreshold = 0.1,
+    showEdgeWarning = true
   } = options
   
   let feedbackEl = null
+  let edgeIndicatorEl = null
+  let styleEl = null
   
-  function show(value, x, y) {
+  function injectStyles() {
+    if (styleEl) return
+    
+    styleEl = document.createElement('style')
+    styleEl.textContent = `
+      @keyframes feedbackFadeIn {
+        from {
+          opacity: 0;
+          transform: translate(-50%, -100%) scale(0.8);
+        }
+        to {
+          opacity: 1;
+          transform: translate(-50%, -100%) scale(1);
+        }
+      }
+      
+      @keyframes feedbackFadeOut {
+        from {
+          opacity: 1;
+          transform: translate(-50%, -100%) scale(1);
+        }
+        to {
+          opacity: 0;
+          transform: translate(-50%, -100%) scale(0.8);
+        }
+      }
+      
+      @keyframes edgePulse {
+        0%, 100% {
+          transform: translate(-50%, -100%) scale(1);
+          box-shadow: 0 4px 12px rgba(231, 76, 60, 0.6);
+        }
+        50% {
+          transform: translate(-50%, -100%) scale(1.05);
+          box-shadow: 0 6px 16px rgba(231, 76, 60, 0.8);
+        }
+      }
+      
+      @keyframes edgeIndicatorFadeIn {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+      
+      .chart-drag-feedback {
+        transition: background 0.3s ease, box-shadow 0.3s ease;
+      }
+      
+      .chart-drag-feedback.edge-max {
+        background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%) !important;
+        animation: edgePulse 0.8s ease-in-out infinite !important;
+      }
+      
+      .chart-drag-feedback.edge-min {
+        background: linear-gradient(135deg, #3498DB 0%, #2980B9 100%) !important;
+        animation: edgePulse 0.8s ease-in-out infinite !important;
+      }
+      
+      .chart-edge-indicator {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 6px 12px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        pointer-events: none;
+        z-index: 9998;
+        white-space: nowrap;
+        animation: edgeIndicatorFadeIn 0.3s ease;
+      }
+      
+      .chart-edge-indicator.max {
+        top: 10px;
+        background: rgba(231, 76, 60, 0.9);
+      }
+      
+      .chart-edge-indicator.min {
+        bottom: 10px;
+        background: rgba(52, 152, 219, 0.9);
+      }
+    `
+    document.head.appendChild(styleEl)
+  }
+  
+  function getEdgeState(value, minValue, maxValue) {
+    if (!showEdgeWarning) return null
+    
+    const range = maxValue - minValue
+    const threshold = range * edgeThreshold
+    
+    if (value >= maxValue - threshold) {
+      return 'max'
+    } else if (value <= minValue + threshold) {
+      return 'min'
+    }
+    
+    return null
+  }
+  
+  function show(value, x, y, minValue = 0, maxValue = 100) {
     hide()
+    injectStyles()
+    
+    const edgeState = getEdgeState(value, minValue, maxValue)
     
     feedbackEl = document.createElement('div')
     feedbackEl.className = 'chart-drag-feedback'
     feedbackEl.textContent = formatValue(value)
+    
+    let additionalClass = ''
+    if (edgeState === 'max') {
+      additionalClass = 'edge-max'
+    } else if (edgeState === 'min') {
+      additionalClass = 'edge-min'
+    }
+    
+    feedbackEl.className += ` ${additionalClass}`
     feedbackEl.style.cssText = `
       position: absolute;
       left: ${x}px;
@@ -216,21 +343,30 @@ export function createDragFeedback(container, options = {}) {
       animation: feedbackFadeIn ${duration}ms ease;
     `
     
-    const style = document.createElement('style')
-    style.textContent = `
-      @keyframes feedbackFadeIn {
-        from {
-          opacity: 0;
-          transform: translate(-50%, -100%) scale(0.8);
-        }
-        to {
-          opacity: 1;
-          transform: translate(-50%, -100%) scale(1);
-        }
-      }
-    `
-    document.head.appendChild(style)
     container.appendChild(feedbackEl)
+    
+    if (edgeState && showEdgeWarning) {
+      showEdgeIndicator(edgeState, x)
+    }
+  }
+  
+  function showEdgeIndicator(edgeState, x) {
+    if (edgeIndicatorEl) {
+      edgeIndicatorEl.remove()
+    }
+    
+    edgeIndicatorEl = document.createElement('div')
+    edgeIndicatorEl.className = `chart-edge-indicator ${edgeState}`
+    
+    if (edgeState === 'max') {
+      edgeIndicatorEl.textContent = '⚠️ 接近最大值'
+    } else if (edgeState === 'min') {
+      edgeIndicatorEl.textContent = '⚠️ 接近最小值'
+    }
+    
+    edgeIndicatorEl.style.left = `${x}px`
+    
+    container.appendChild(edgeIndicatorEl)
   }
   
   function hide() {
@@ -241,15 +377,36 @@ export function createDragFeedback(container, options = {}) {
         feedbackEl = null
       }, duration)
     }
+    
+    if (edgeIndicatorEl) {
+      edgeIndicatorEl.remove()
+      edgeIndicatorEl = null
+    }
   }
   
-  function update(value, x, y) {
+  function update(value, x, y, minValue = 0, maxValue = 100) {
     if (feedbackEl) {
+      const edgeState = getEdgeState(value, minValue, maxValue)
+      
       feedbackEl.textContent = formatValue(value)
       feedbackEl.style.left = `${x}px`
       feedbackEl.style.top = `${y - offset}px`
+      
+      feedbackEl.classList.remove('edge-max', 'edge-min')
+      if (edgeState === 'max') {
+        feedbackEl.classList.add('edge-max')
+      } else if (edgeState === 'min') {
+        feedbackEl.classList.add('edge-min')
+      }
+      
+      if (edgeState && showEdgeWarning) {
+        showEdgeIndicator(edgeState, x)
+      } else if (edgeIndicatorEl) {
+        edgeIndicatorEl.remove()
+        edgeIndicatorEl = null
+      }
     } else {
-      show(value, x, y)
+      show(value, x, y, minValue, maxValue)
     }
   }
   
