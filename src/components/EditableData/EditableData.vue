@@ -325,26 +325,76 @@
       </div>
     </div>
     
-    <div class="data-stats" v-if="showStats">
-      <div class="stat-item">
-        <span class="stat-label">📊 数据量</span>
-        <span class="stat-value">{{ dataCount }}</span>
+    <div class="data-stats-wrapper" v-if="showStats">
+      <div class="stats-header">
+        <h4 class="stats-title">📊 数据统计</h4>
+        <button class="btn-stats-control" @click="showStatsControl = !showStatsControl" title="控制显示项">
+          <span class="control-icon">⚙️</span>
+        </button>
       </div>
-      <div class="stat-item" v-if="dataStats.sum !== undefined">
-        <span class="stat-label">➕ 总和</span>
-        <span class="stat-value">{{ dataStats.sum }}</span>
+      
+      <div class="stats-control-panel" :class="{ 'collapsed': !showStatsControl }">
+        <div class="control-hint">💡 点击统计项的问号可显示/隐藏答案</div>
+        <div class="control-grid">
+          <div class="control-item">
+            <label class="control-label">数据量</label>
+            <button :class="['toggle-switch', { on: showStatCount }]" @click="showStatCount = !showStatCount">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          <div class="control-item">
+            <label class="control-label">总和</label>
+            <button :class="['toggle-switch', { on: showStatSum }]" @click="showStatSum = !showStatSum">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          <div class="control-item">
+            <label class="control-label">平均值</label>
+            <button :class="['toggle-switch', { on: showStatAverage }]" @click="showStatAverage = !showStatAverage">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          <div class="control-item">
+            <label class="control-label">最大值</label>
+            <button :class="['toggle-switch', { on: showStatMax }]" @click="showStatMax = !showStatMax">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          <div class="control-item">
+            <label class="control-label">最小值</label>
+            <button :class="['toggle-switch', { on: showStatMin }]" @click="showStatMin = !showStatMin">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+        </div>
       </div>
-      <div class="stat-item" v-if="dataStats.average !== undefined">
-        <span class="stat-label">📈 平均值</span>
-        <span class="stat-value">{{ dataStats.average.toFixed(1) }}</span>
-      </div>
-      <div class="stat-item" v-if="dataStats.max !== undefined">
-        <span class="stat-label">🔺 最大值</span>
-        <span class="stat-value">{{ dataStats.max }}</span>
-      </div>
-      <div class="stat-item" v-if="dataStats.min !== undefined">
-        <span class="stat-label">🔻 最小值</span>
-        <span class="stat-value">{{ dataStats.min }}</span>
+      
+      <div class="data-stats">
+        <div class="stat-item" :class="{ 'hidden-answer': !showStatCount }" @click="showStatCount = !showStatCount">
+          <span class="stat-label">📊 数据量</span>
+          <span v-if="showStatCount" class="stat-value">{{ dataCount }}</span>
+          <span v-else class="stat-value question-mark">?</span>
+        </div>
+        <div class="stat-item" :class="{ 'hidden-answer': !showStatSum }" @click="showStatSum = !showStatSum" v-if="dataStats.sum !== undefined">
+          <span class="stat-label">➕ 总和</span>
+          <span v-if="showStatSum" class="stat-value">{{ dataStats.sum }}</span>
+          <span v-else class="stat-value question-mark">?</span>
+        </div>
+        <div class="stat-item" :class="{ 'hidden-answer': !showStatAverage }" @click="showStatAverage = !showStatAverage" v-if="dataStats.average !== undefined">
+          <span class="stat-label">📈 平均值</span>
+          <span v-if="showStatAverage" class="stat-value">{{ dataStats.average.toFixed(1) }}</span>
+          <span v-else class="stat-value question-mark">?</span>
+        </div>
+        <div class="stat-item" :class="{ 'hidden-answer': !showStatMax }" @click="showStatMax = !showStatMax" v-if="dataStats.max !== undefined">
+          <span class="stat-label">🔺 最大值</span>
+          <span v-if="showStatMax" class="stat-value">{{ dataStats.max }}</span>
+          <span v-else class="stat-value question-mark">?</span>
+        </div>
+        <div class="stat-item" :class="{ 'hidden-answer': !showStatMin }" @click="showStatMin = !showStatMin" v-if="dataStats.min !== undefined">
+          <span class="stat-label">🔻 最小值</span>
+          <span v-if="showStatMin" class="stat-value">{{ dataStats.min }}</span>
+          <span v-else class="stat-value question-mark">?</span>
+        </div>
       </div>
     </div>
     
@@ -488,6 +538,13 @@ const predictionCount = ref(3)
 const predictionAlgorithm = ref('linear')
 const isPredicting = ref(false)
 const predictionResult = ref(null)
+
+const showStatsControl = ref(false)
+const showStatCount = ref(true)
+const showStatSum = ref(true)
+const showStatAverage = ref(true)
+const showStatMax = ref(true)
+const showStatMin = ref(true)
 
 const editableData = ref({
   rows: [],
@@ -1614,13 +1671,105 @@ onMounted(() => {
   transform: scale(1.1);
 }
 
+.data-stats-wrapper {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #F8F9FA 0%, #E8F4F8 100%);
+  border-bottom: 1px solid #E1E4E8;
+}
+
+.stats-title {
+  font-size: 16px;
+  color: #333;
+  margin: 0;
+  font-weight: 600;
+}
+
+.btn-stats-control {
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: 1px solid #E1E4E8;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.btn-stats-control:hover {
+  background: #4A90E2;
+  border-color: #4A90E2;
+}
+
+.btn-stats-control:hover .control-icon {
+  filter: brightness(10);
+}
+
+.control-icon {
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.stats-control-panel {
+  max-height: 200px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  background: white;
+  border-bottom: 1px solid #E1E4E8;
+}
+
+.stats-control-panel.collapsed {
+  max-height: 0;
+  border-bottom: none;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  padding: 12px 16px;
+}
+
+.control-hint {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: #666;
+  background: #FFF9E6;
+  border-bottom: 1px solid #FFE082;
+}
+
+.control-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #F8F9FA;
+  border-radius: 6px;
+}
+
+.control-label {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+}
+
 .data-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px;
   padding: 16px;
   background: linear-gradient(135deg, #F8F9FA 0%, #E8F4F8 100%);
-  border-radius: 8px;
 }
 
 .stat-item {
@@ -1632,11 +1781,37 @@ onMounted(() => {
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
 }
 
 .stat-item:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-item.hidden-answer {
+  background: linear-gradient(135deg, #FFF9E6 0%, #FFF3CD 100%);
+  border: 2px dashed #F5A623;
+}
+
+.stat-item.hidden-answer:hover {
+  background: linear-gradient(135deg, #FFF3CD 0%, #FFE082 100%);
+  border-color: #E67E22;
+}
+
+.stat-item.hidden-answer::after {
+  content: '点击揭晓';
+  position: absolute;
+  bottom: 4px;
+  font-size: 10px;
+  color: #F5A623;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.stat-item.hidden-answer:hover::after {
+  opacity: 1;
 }
 
 .stat-label {
@@ -1649,6 +1824,23 @@ onMounted(() => {
   font-size: 20px;
   color: #4A90E2;
   font-weight: 700;
+}
+
+.stat-value.question-mark {
+  color: #F5A623;
+  font-size: 32px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }
 
 .ai-prediction-section {
