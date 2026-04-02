@@ -347,11 +347,116 @@
         <span class="stat-value">{{ dataStats.min }}</span>
       </div>
     </div>
+    
+    <div class="ai-prediction-section">
+      <div class="prediction-header" @click="showPredictionPanel = !showPredictionPanel">
+        <h3 class="prediction-title">🤖 AI 智能预测</h3>
+        <button class="btn-toggle-prediction">
+          <span :class="['toggle-icon', { rotated: showPredictionPanel }]">▼</span>
+        </button>
+      </div>
+      
+      <div class="prediction-panel" :class="{ collapsed: !showPredictionPanel }">
+        <div class="prediction-config">
+          <div class="config-row">
+            <div class="config-item">
+              <label class="config-label">预测算法</label>
+              <select class="config-select" v-model="predictionAlgorithm">
+                <option value="auto">🤖 自动选择</option>
+                <option value="linear">📈 线性回归</option>
+                <option value="polynomial">📊 多项式拟合</option>
+              </select>
+            </div>
+            <div class="config-item">
+              <label class="config-label">预测数量</label>
+              <input 
+                type="number" 
+                class="config-input" 
+                v-model.number="predictionCount"
+                min="1"
+                max="10"
+              />
+            </div>
+          </div>
+          
+          <div class="scene-info" v-if="getSceneType() !== 'default'">
+            <span class="scene-icon">🎯</span>
+            <span class="scene-text">场景识别: {{ getSceneBasedPredictionConfig(getSceneType()).description }}</span>
+          </div>
+          
+          <button 
+            class="btn btn-primary prediction-btn"
+            @click="runAIPredictionForData"
+            :disabled="isPredicting || dataCount < 2"
+          >
+            <span v-if="isPredicting" class="loading-spinner"></span>
+            {{ isPredicting ? 'AI 分析中...' : '🔮 开始预测' }}
+          </button>
+          
+          <p class="prediction-hint" v-if="dataCount < 2">
+            ⚠️ 需要至少2个数据点才能进行预测
+          </p>
+        </div>
+        
+        <div v-if="predictionResult" class="prediction-result">
+          <div class="result-header">
+            <h4 class="result-title">📋 预测结果</h4>
+            <div class="result-badges">
+              <span :class="['trend-badge', predictionResult.trend]">
+                {{ getTrendIcon(predictionResult.trend) }} {{ getTrendText(predictionResult.trend) }}
+              </span>
+              <span class="confidence-badge">
+                置信度: {{ predictionResult.confidence }}%
+              </span>
+            </div>
+          </div>
+          
+          <div class="prediction-metrics">
+            <div class="metric-item">
+              <span class="metric-label">R² 拟合度</span>
+              <span class="metric-value">{{ (predictionResult.r2Score * 100).toFixed(1) }}%</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">算法类型</span>
+              <span class="metric-value">{{ predictionResult.algorithm === 'linear' ? '线性回归' : '多项式拟合' }}</span>
+            </div>
+          </div>
+          
+          <div class="prediction-values">
+            <div 
+              v-for="(value, index) in predictionResult.predictions" 
+              :key="index"
+              class="prediction-item"
+            >
+              <span class="prediction-label">预测 {{ index + 1 }}</span>
+              <span class="prediction-value">{{ value }}</span>
+              <span class="prediction-unit">{{ predictionResult.unit }}</span>
+            </div>
+          </div>
+          
+          <div class="prediction-actions">
+            <button class="btn btn-success apply-btn" @click="applyPredictionToData">
+              ✅ 应用预测数据
+            </button>
+            <button class="btn btn-secondary clear-btn" @click="clearPrediction">
+              🗑️ 清除预测
+            </button>
+          </div>
+        </div>
+        
+        <div v-else class="prediction-placeholder">
+          <div class="placeholder-icon">🔮</div>
+          <p>点击"开始预测"按钮</p>
+          <p>AI 将根据现有数据分析趋势并预测未来数值</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { runAIPrediction, getSceneBasedPredictionConfig } from '../../utils/helpers'
 
 const props = defineProps({
   scene: {
@@ -377,6 +482,12 @@ const allowDeleteCol = ref(true)
 const showViewSwitch = ref(true)
 const viewMode = ref('table')
 const flatData = ref([])
+
+const showPredictionPanel = ref(false)
+const predictionCount = ref(3)
+const predictionAlgorithm = ref('linear')
+const isPredicting = ref(false)
+const predictionResult = ref(null)
 
 const editableData = ref({
   rows: [],
@@ -711,6 +822,109 @@ function resetData() {
     loadData()
     handleDataChange()
   }
+}
+
+function getSceneType() {
+  const title = props.scene.content?.title || ''
+  const titleLower = title.toLowerCase()
+  
+  if (titleLower.includes('销售') || titleLower.includes('营收') || titleLower.includes('sales')) {
+    return 'sales'
+  } else if (titleLower.includes('温度') || titleLower.includes('气温') || titleLower.includes('temperature')) {
+    return 'temperature'
+  } else if (titleLower.includes('人口') || titleLower.includes('population')) {
+    return 'population'
+  } else if (titleLower.includes('股票') || titleLower.includes('股价') || titleLower.includes('stock')) {
+    return 'stock'
+  } else if (titleLower.includes('流量') || titleLower.includes('访问') || titleLower.includes('traffic')) {
+    return 'traffic'
+  }
+  return 'default'
+}
+
+function runAIPredictionForData() {
+  isPredicting.value = true
+  
+  setTimeout(() => {
+    const values = getAllValues()
+    const sceneType = getSceneType()
+    const config = getSceneBasedPredictionConfig(sceneType)
+    
+    if (predictionAlgorithm.value === 'auto') {
+      predictionAlgorithm.value = config.algorithm
+    }
+    
+    const result = runAIPrediction(values, predictionCount.value, predictionAlgorithm.value)
+    
+    predictionResult.value = {
+      ...result,
+      sceneDescription: config.description,
+      unit: config.unit
+    }
+    
+    isPredicting.value = false
+  }, 800)
+}
+
+function applyPredictionToData() {
+  if (!predictionResult.value || predictionResult.value.predictions.length === 0) return
+  
+  const predictions = predictionResult.value.predictions
+  
+  if (dataType.value === 'table') {
+    predictions.forEach((value, index) => {
+      const rowIndex = editableData.value.rows.length
+      const newRow = new Array(tableHeaders.value.length).fill(0)
+      newRow[newRow.length - 1] = value
+      editableData.value.rows.push(newRow)
+      rowHeaders.value.push(`预测${index + 1}`)
+    })
+  } else if (dataType.value === 'categories') {
+    predictions.forEach((value, index) => {
+      editableData.value.categories.push({
+        name: `预测${index + 1}`,
+        amount: value
+      })
+    })
+  } else if (dataType.value === 'ranges') {
+    predictions.forEach((value, index) => {
+      editableData.value.ranges.push({
+        range: `预测${index + 1}`,
+        count: Math.round(value)
+      })
+    })
+  } else if (dataType.value === 'daily') {
+    predictions.forEach((value, index) => {
+      editableData.value.data.push({
+        day: `预测${index + 1}`,
+        [valueKey.value]: value
+      })
+    })
+  }
+  
+  handleDataChange()
+}
+
+function clearPrediction() {
+  predictionResult.value = null
+}
+
+function getTrendIcon(trend) {
+  const icons = {
+    up: '📈',
+    down: '📉',
+    stable: '➡️'
+  }
+  return icons[trend] || '➡️'
+}
+
+function getTrendText(trend) {
+  const texts = {
+    up: '上升趋势',
+    down: '下降趋势',
+    stable: '平稳趋势'
+  }
+  return texts[trend] || '平稳趋势'
 }
 
 watch(() => props.scene, () => {
@@ -1435,5 +1649,344 @@ onMounted(() => {
   font-size: 20px;
   color: #4A90E2;
   font-weight: 700;
+}
+
+.ai-prediction-section {
+  margin-top: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.prediction-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.prediction-header:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.prediction-title {
+  font-size: 18px;
+  color: white;
+  margin: 0;
+  font-weight: 600;
+}
+
+.btn-toggle-prediction {
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.btn-toggle-prediction:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.prediction-panel {
+  background: white;
+  padding: 20px;
+  transition: all 0.4s ease;
+}
+
+.prediction-panel.collapsed {
+  max-height: 0;
+  padding: 0 20px;
+  overflow: hidden;
+}
+
+.prediction-config {
+  margin-bottom: 20px;
+}
+
+.config-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.config-select,
+.config-input {
+  padding: 10px 12px;
+  border: 2px solid #E1E4E8;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.config-select:focus,
+.config-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.scene-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.scene-icon {
+  font-size: 16px;
+}
+
+.scene-text {
+  font-size: 13px;
+  color: #2E7D32;
+  font-weight: 500;
+}
+
+.prediction-btn {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.prediction-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.prediction-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.loading-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.prediction-hint {
+  text-align: center;
+  color: #E74C3C;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.prediction-result {
+  background: linear-gradient(135deg, #F8F9FA 0%, #E8F4F8 100%);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.result-title {
+  font-size: 16px;
+  color: #333;
+  margin: 0;
+  font-weight: 600;
+}
+
+.result-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trend-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.trend-badge.up {
+  background: rgba(126, 211, 33, 0.2);
+  color: #7ED321;
+}
+
+.trend-badge.down {
+  background: rgba(231, 76, 60, 0.2);
+  color: #E74C3C;
+}
+
+.trend-badge.stable {
+  background: rgba(74, 144, 226, 0.2);
+  color: #4A90E2;
+}
+
+.confidence-badge {
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.prediction-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: white;
+  border-radius: 8px;
+}
+
+.metric-label {
+  font-size: 13px;
+  color: #666;
+}
+
+.metric-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.prediction-values {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.prediction-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.prediction-label {
+  font-size: 14px;
+  color: #666;
+  min-width: 60px;
+}
+
+.prediction-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #667eea;
+  flex: 1;
+}
+
+.prediction-unit {
+  font-size: 12px;
+  color: #999;
+}
+
+.prediction-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.apply-btn,
+.clear-btn {
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.apply-btn {
+  background: linear-gradient(135deg, #7ED321 0%, #5CB85C 100%);
+  color: white;
+}
+
+.apply-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(126, 211, 33, 0.4);
+}
+
+.clear-btn {
+  background: #F8F9FA;
+  color: #666;
+  border: 2px solid #E1E4E8;
+}
+
+.clear-btn:hover {
+  background: #E1E4E8;
+}
+
+.prediction-placeholder {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.placeholder-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.prediction-placeholder p {
+  font-size: 14px;
+  margin: 4px 0;
+  line-height: 1.6;
 }
 </style>
