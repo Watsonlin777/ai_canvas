@@ -29,6 +29,7 @@
         :autoresize="true"
         @click="handleChartClick"
         @mousedown="handleMouseDown"
+        @touchstart="handleTouchStart"
       />
     </div>
     
@@ -42,7 +43,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { BarChart, LineChart, ScatterChart } from 'echarts/charts'
@@ -55,6 +56,7 @@ import {
 import VChart from 'vue-echarts'
 import { useChartStore } from '../../store/chartStore'
 import gsap from 'gsap'
+import { createDragFeedback } from '../../utils/chartDrag'
 
 use([
   CanvasRenderer,
@@ -72,6 +74,7 @@ const chartRef = ref(null)
 const chartContainer = ref(null)
 const isDragging = ref(false)
 const dragIndex = ref(-1)
+let dragFeedback = null
 
 const chartTypes = [
   { value: 'bar', label: '柱形图', icon: '📊' },
@@ -298,16 +301,48 @@ function handleMouseDown(params) {
     isDragging.value = true
     dragIndex.value = params.dataIndex
     
+    if (!dragFeedback && chartContainer.value) {
+      dragFeedback = createDragFeedback(chartContainer.value, {
+        formatValue: (val) => val.toFixed(1),
+        offset: 15
+      })
+    }
+    
     const handleMouseMove = (e) => {
       if (isDragging.value && chartContainer.value) {
         const rect = chartContainer.value.getBoundingClientRect()
-        const chartHeight = rect.height - 100
-        const relativeY = rect.bottom - e.clientY - 50
-        const maxValue = Math.max(...chartStore.values) * 1.2
-        const newValue = Math.round((relativeY / chartHeight) * maxValue)
+        const chartInstance = chartRef.value
         
-        if (newValue >= 0 && dragIndex.value >= 0) {
-          chartStore.updateDataItem(dragIndex.value, 'value', Math.max(0, newValue))
+        if (!chartInstance) return
+        
+        const model = chartInstance.getModel()
+        const grid = model.getComponent('grid')
+        if (!grid) return
+        
+        const gridRect = grid.coordinateSystem.getArea()
+        const yAxis = model.getComponent('yAxis')
+        if (!yAxis) return
+        
+        const extent = yAxis.axis.getExtent()
+        const maxValue = extent[1]
+        const minValue = extent[0]
+        
+        const relativeY = e.clientY - rect.top - gridRect.y
+        const chartHeight = gridRect.height
+        
+        const ratio = 1 - (relativeY / chartHeight)
+        const newValue = Math.round(minValue + ratio * (maxValue - minValue))
+        const clampedValue = Math.max(minValue, Math.min(maxValue, newValue))
+        
+        if (clampedValue >= 0 && dragIndex.value >= 0) {
+          chartStore.updateDataItem(dragIndex.value, 'value', Math.max(0, clampedValue))
+          
+          if (dragFeedback) {
+            const point = chartInstance.convertToPixel({ seriesIndex: 0 }, [dragIndex.value, clampedValue])
+            if (point) {
+              dragFeedback.update(clampedValue, point[0], point[1])
+            }
+          }
         }
       }
     }
@@ -315,6 +350,9 @@ function handleMouseDown(params) {
     const handleMouseUp = () => {
       isDragging.value = false
       dragIndex.value = -1
+      if (dragFeedback) {
+        dragFeedback.hide()
+      }
       chartStore.saveSettings()
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
@@ -324,6 +362,101 @@ function handleMouseDown(params) {
     document.addEventListener('mouseup', handleMouseUp)
   }
 }
+
+function handleTouchStart(params) {
+  if (params.componentType !== 'series') return
+  if (chartStore.chartType !== 'bar') return
+  
+  isDragging.value = true
+  dragIndex.value = params.dataIndex
+  
+  if (!dragFeedback && chartContainer.value) {
+    dragFeedback = createDragFeedback(chartContainer.value, {
+      formatValue: (val) => val.toFixed(1),
+      offset: 15
+    })
+  }
+  
+  const touchId = params.event.event.touches[0].identifier
+  
+  const handleTouchMove = (e) => {
+    if (!isDragging.value || dragIndex.value < 0 || !chartContainer.value) return
+    
+    const touch = Array.from(e.touches).find(t => t.identifier === touchId)
+    if (!touch) return
+    
+    e.preventDefault()
+    
+    const rect = chartContainer.value.getBoundingClientRect()
+    const chartInstance = chartRef.value
+    
+    if (!chartInstance) return
+    
+    const model = chartInstance.getModel()
+    const grid = model.getComponent('grid')
+    if (!grid) return
+    
+    const gridRect = grid.coordinateSystem.getArea()
+    const yAxis = model.getComponent('yAxis')
+    if (!yAxis) return
+    
+    const extent = yAxis.axis.getExtent()
+    const maxValue = extent[1]
+    const minValue = extent[0]
+    
+    const relativeY = touch.clientY - rect.top - gridRect.y
+    const chartHeight = gridRect.height
+    
+    const ratio = 1 - (relativeY / chartHeight)
+    const newValue = Math.round(minValue + ratio * (maxValue - minValue))
+    const clampedValue = Math.max(minValue, Math.min(maxValue, newValue))
+    
+    if (clampedValue >= 0 && dragIndex.value >= 0) {
+      chartStore.updateDataItem(dragIndex.value, 'value', Math.max(0, clampedValue))
+      
+      if (dragFeedback) {
+        const point = chartInstance.convertToPixel({ seriesIndex: 0 }, [dragIndex.value, clampedValue])
+        if (point) {
+          dragFeedback.update(clampedValue, point[0], point[1])
+        }
+      }
+    }
+  }
+  
+  const handleTouchEnd = () => {
+    isDragging.value = false
+    dragIndex.value = -1
+    if (dragFeedback) {
+      dragFeedback.hide()
+    }
+    chartStore.saveSettings()
+    chartContainer.value.removeEventListener('touchmove', handleTouchMove)
+    chartContainer.value.removeEventListener('touchend', handleTouchEnd)
+    chartContainer.value.removeEventListener('touchcancel', handleTouchEnd)
+  }
+  
+  if (chartContainer.value) {
+    chartContainer.value.addEventListener('touchmove', handleTouchMove, { passive: false })
+    chartContainer.value.addEventListener('touchend', handleTouchEnd)
+    chartContainer.value.addEventListener('touchcancel', handleTouchEnd)
+  }
+}
+
+onMounted(() => {
+  if (chartContainer.value) {
+    dragFeedback = createDragFeedback(chartContainer.value, {
+      formatValue: (val) => val.toFixed(1),
+      offset: 15
+    })
+  }
+})
+
+onBeforeUnmount(() => {
+  if (dragFeedback) {
+    dragFeedback.hide()
+    dragFeedback = null
+  }
+})
 
 watch(() => chartStore.dataItems, () => {
   if (chartRef.value) {

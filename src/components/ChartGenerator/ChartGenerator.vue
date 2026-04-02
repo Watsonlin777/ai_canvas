@@ -87,6 +87,9 @@
         :option="chartOption" 
         :autoresize="true"
         theme="light"
+        @click="handleChartClick"
+        @mousedown="handleMouseDown"
+        @touchstart="handleTouchStart"
       />
     </div>
     
@@ -108,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
@@ -120,6 +123,7 @@ import {
   ToolboxComponent
 } from 'echarts/components'
 import VChart from 'vue-echarts'
+import { useChartDrag, createDragFeedback, animateValueChange } from '../../utils/chartDrag'
 
 use([
   CanvasRenderer,
@@ -148,6 +152,8 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['dataChange'])
+
 const chartRef = ref(null)
 const chartContainer = ref(null)
 const chartType = ref('bar')
@@ -161,6 +167,10 @@ const showArea = ref(true)
 const showGrid = ref(true)
 const showChartInfo = ref(true)
 const isRefreshing = ref(false)
+
+const dragIndex = ref(-1)
+const dragValue = ref(null)
+let dragFeedback = null
 
 const chartTypeNames = {
   bar: '柱状图',
@@ -807,6 +817,210 @@ function refreshChart() {
     isRefreshing.value = false
   }, 600)
 }
+
+function handleChartClick(params) {
+  if (params.componentType === 'series') {
+    dragIndex.value = params.dataIndex
+    setTimeout(() => {
+      dragIndex.value = -1
+    }, 500)
+  }
+}
+
+function handleMouseDown(params) {
+  if (params.componentType !== 'series') return
+  if (chartType.value === 'pie') return
+  
+  const seriesType = params.seriesType
+  if (seriesType !== 'bar' && seriesType !== 'line' && seriesType !== 'scatter') return
+  
+  dragIndex.value = params.dataIndex
+  dragValue.value = params.value
+  
+  if (!dragFeedback && chartContainer.value) {
+    dragFeedback = createDragFeedback(chartContainer.value, {
+      formatValue: (val) => val.toFixed(1),
+      offset: 15
+    })
+  }
+  
+  const handleMouseMove = (e) => {
+    if (dragIndex.value < 0 || !chartContainer.value) return
+    
+    const rect = chartContainer.value.getBoundingClientRect()
+    const chartInstance = chartRef.value
+    
+    if (!chartInstance) return
+    
+    const model = chartInstance.getModel()
+    const grid = model.getComponent('grid')
+    if (!grid) return
+    
+    const gridRect = grid.coordinateSystem.getArea()
+    const yAxis = model.getComponent('yAxis')
+    if (!yAxis) return
+    
+    const extent = yAxis.axis.getExtent()
+    const maxValue = extent[1]
+    const minValue = extent[0]
+    
+    const relativeY = e.clientY - rect.top - gridRect.y
+    const chartHeight = gridRect.height
+    
+    const ratio = 1 - (relativeY / chartHeight)
+    const newValue = Math.round(minValue + ratio * (maxValue - minValue))
+    const clampedValue = Math.max(minValue, Math.min(maxValue, newValue))
+    
+    updateDataValue(dragIndex.value, clampedValue)
+    
+    if (dragFeedback) {
+      const point = chartInstance.convertToPixel({ seriesIndex: 0 }, [dragIndex.value, clampedValue])
+      if (point) {
+        dragFeedback.update(clampedValue, point[0], point[1])
+      }
+    }
+  }
+  
+  const handleMouseUp = () => {
+    dragIndex.value = -1
+    dragValue.value = null
+    if (dragFeedback) {
+      dragFeedback.hide()
+    }
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
+  }
+  
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseup', handleMouseUp)
+}
+
+function handleTouchStart(params) {
+  if (params.componentType !== 'series') return
+  if (chartType.value === 'pie') return
+  
+  const seriesType = params.seriesType
+  if (seriesType !== 'bar' && seriesType !== 'line' && seriesType !== 'scatter') return
+  
+  dragIndex.value = params.dataIndex
+  dragValue.value = params.value
+  
+  if (!dragFeedback && chartContainer.value) {
+    dragFeedback = createDragFeedback(chartContainer.value, {
+      formatValue: (val) => val.toFixed(1),
+      offset: 15
+    })
+  }
+  
+  const touchId = params.event.event.touches[0].identifier
+  
+  const handleTouchMove = (e) => {
+    if (dragIndex.value < 0 || !chartContainer.value) return
+    
+    const touch = Array.from(e.touches).find(t => t.identifier === touchId)
+    if (!touch) return
+    
+    e.preventDefault()
+    
+    const rect = chartContainer.value.getBoundingClientRect()
+    const chartInstance = chartRef.value
+    
+    if (!chartInstance) return
+    
+    const model = chartInstance.getModel()
+    const grid = model.getComponent('grid')
+    if (!grid) return
+    
+    const gridRect = grid.coordinateSystem.getArea()
+    const yAxis = model.getComponent('yAxis')
+    if (!yAxis) return
+    
+    const extent = yAxis.axis.getExtent()
+    const maxValue = extent[1]
+    const minValue = extent[0]
+    
+    const relativeY = touch.clientY - rect.top - gridRect.y
+    const chartHeight = gridRect.height
+    
+    const ratio = 1 - (relativeY / chartHeight)
+    const newValue = Math.round(minValue + ratio * (maxValue - minValue))
+    const clampedValue = Math.max(minValue, Math.min(maxValue, newValue))
+    
+    updateDataValue(dragIndex.value, clampedValue)
+    
+    if (dragFeedback) {
+      const point = chartInstance.convertToPixel({ seriesIndex: 0 }, [dragIndex.value, clampedValue])
+      if (point) {
+        dragFeedback.update(clampedValue, point[0], point[1])
+      }
+    }
+  }
+  
+  const handleTouchEnd = (e) => {
+    dragIndex.value = -1
+    dragValue.value = null
+    if (dragFeedback) {
+      dragFeedback.hide()
+    }
+    chartContainer.value.removeEventListener('touchmove', handleTouchMove)
+    chartContainer.value.removeEventListener('touchend', handleTouchEnd)
+    chartContainer.value.removeEventListener('touchcancel', handleTouchEnd)
+  }
+  
+  if (chartContainer.value) {
+    chartContainer.value.addEventListener('touchmove', handleTouchMove, { passive: false })
+    chartContainer.value.addEventListener('touchend', handleTouchEnd)
+    chartContainer.value.addEventListener('touchcancel', handleTouchEnd)
+  }
+}
+
+function updateDataValue(index, value) {
+  const data = props.data?.data
+  if (!data) return
+  
+  if (props.viewMode === 'flat') {
+    if (data[index]) {
+      data[index].value = value
+    }
+  } else if (props.data?.type === 'table') {
+    const colIndex = index % (data[0]?.length || 1)
+    const rowIndex = Math.floor(index / (data[0]?.length || 1))
+    if (data[rowIndex] && data[rowIndex][colIndex] !== undefined) {
+      data[rowIndex][colIndex] = value
+    }
+  } else if (props.data?.type === 'categories') {
+    if (data[index]) {
+      data[index].amount = value
+    }
+  } else if (props.data?.type === 'ranges') {
+    if (data[index]) {
+      data[index].count = value
+    }
+  } else if (props.data?.type === 'daily') {
+    const valueKey = Object.keys(data[0] || {}).find(k => k !== 'day')
+    if (data[index] && valueKey) {
+      data[index][valueKey] = value
+    }
+  }
+  
+  emit('dataChange', props.data)
+}
+
+onMounted(() => {
+  if (chartContainer.value) {
+    dragFeedback = createDragFeedback(chartContainer.value, {
+      formatValue: (val) => val.toFixed(1),
+      offset: 15
+    })
+  }
+})
+
+onBeforeUnmount(() => {
+  if (dragFeedback) {
+    dragFeedback.hide()
+    dragFeedback = null
+  }
+})
 </script>
 
 <style scoped>
