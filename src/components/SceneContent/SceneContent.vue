@@ -36,6 +36,75 @@
             </div>
           </div>
           
+          <div class="thinking-skills-section">
+            <div class="skills-header" @click="showThinkingSkills = !showThinkingSkills">
+              <div class="skills-title">
+                <span class="skills-icon">🧠</span>
+                <span>思考技巧</span>
+              </div>
+              <button class="btn-toggle-skills">
+                <span :class="['toggle-arrow', { 'rotated': showThinkingSkills }]">▼</span>
+              </button>
+            </div>
+            
+            <div class="skills-content" :class="{ 'collapsed': !showThinkingSkills }">
+              <h4 class="skills-subtitle">{{ thinkingSkills.title }}</h4>
+              <div class="skills-grid">
+                <div 
+                  v-for="(skill, index) in thinkingSkills.skills" 
+                  :key="index"
+                  class="skill-card"
+                >
+                  <div class="skill-icon">{{ ['📊', '✏️', '🔍', '📐'][index % 4] }}</div>
+                  <div class="skill-info">
+                    <h5 class="skill-name">{{ skill.name }}</h5>
+                    <p class="skill-desc">{{ skill.description }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="realtime-answers-section">
+            <div class="answers-header" @click="showRealTimeAnswers = !showRealTimeAnswers">
+              <div class="answers-title">
+                <span class="answers-icon">🎯</span>
+                <span>实时答案</span>
+                <span class="data-badge">基于当前数据</span>
+              </div>
+              <button class="btn-toggle-answers">
+                <span :class="['toggle-arrow', { 'rotated': showRealTimeAnswers }]">▼</span>
+              </button>
+            </div>
+            
+            <div class="answers-content" :class="{ 'collapsed': !showRealTimeAnswers }">
+              <div v-if="realTimeAnswers.length > 0" class="answers-list">
+                <div 
+                  v-for="(answer, index) in realTimeAnswers" 
+                  :key="index"
+                  class="answer-item"
+                >
+                  <div class="answer-question">
+                    <span class="q-icon">Q</span>
+                    <span>{{ answer.question }}</span>
+                  </div>
+                  <div class="answer-text">
+                    <span class="a-icon">A</span>
+                    <span>{{ answer.answer }}</span>
+                  </div>
+                  <div class="answer-hint">
+                    <span class="hint-icon">💡</span>
+                    <span>{{ answer.hint }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="no-data-hint">
+                <span class="hint-icon">📝</span>
+                <span>请先输入数据以获取实时答案</span>
+              </div>
+            </div>
+          </div>
+          
           <div class="activity-box">
             <h4>📝 活动</h4>
             <ol class="activity-list">
@@ -67,9 +136,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted, computed } from 'vue'
 import EditableData from '../EditableData/EditableData.vue'
 import ChartGenerator from '../ChartGenerator/ChartGenerator.vue'
+import { getThinkingSkills, generateRealTimeAnswers, getSceneTypeFromTitle } from '../../utils/helpers'
 
 const props = defineProps({
   scene: {
@@ -86,6 +156,21 @@ const chartData = ref({
   data: []
 })
 const viewMode = ref('table')
+
+const showThinkingSkills = ref(false)
+const showRealTimeAnswers = ref(false)
+
+const sceneType = computed(() => {
+  return getSceneTypeFromTitle(currentScene.value.content?.title)
+})
+
+const thinkingSkills = computed(() => {
+  return getThinkingSkills(sceneType.value)
+})
+
+const realTimeAnswers = computed(() => {
+  return generateRealTimeAnswers(chartData.value, sceneType.value)
+})
 
 function handleDataChange(updatedData) {
   chartData.value = updatedData
@@ -291,6 +376,254 @@ onMounted(() => {
   color: #333;
   line-height: 1.8;
   margin-bottom: 8px;
+}
+
+.thinking-skills-section,
+.realtime-answers-section {
+  margin-bottom: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.skills-header,
+.answers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.skills-header {
+  background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+}
+
+.answers-header {
+  background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+}
+
+.skills-header:hover,
+.answers-header:hover {
+  filter: brightness(0.95);
+}
+
+.skills-title,
+.answers-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.skills-icon,
+.answers-icon {
+  font-size: 18px;
+}
+
+.data-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: rgba(74, 144, 226, 0.2);
+  color: #1565C0;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.btn-toggle-skills,
+.btn-toggle-answers {
+  width: 28px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.5);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.toggle-arrow {
+  font-size: 12px;
+  color: #666;
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.toggle-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.skills-content,
+.answers-content {
+  max-height: 500px;
+  overflow: hidden;
+  transition: all 0.4s ease;
+  background: white;
+  border: 1px solid #E1E4E8;
+  border-top: none;
+}
+
+.skills-content.collapsed,
+.answers-content.collapsed {
+  max-height: 0;
+  border-color: transparent;
+}
+
+.skills-subtitle {
+  font-size: 14px;
+  color: #2E7D32;
+  margin: 0 0 12px 0;
+  padding: 12px 16px 0;
+  font-weight: 600;
+}
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.skill-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: #F8F9FA;
+  border-radius: 8px;
+  border-left: 3px solid #4CAF50;
+  transition: all 0.3s ease;
+}
+
+.skill-card:hover {
+  background: #E8F5E9;
+  transform: translateX(4px);
+}
+
+.skill-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.skill-info {
+  flex: 1;
+}
+
+.skill-name {
+  font-size: 14px;
+  color: #333;
+  margin: 0 0 4px 0;
+  font-weight: 600;
+}
+
+.skill-desc {
+  font-size: 12px;
+  color: #666;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.answers-list {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.answer-item {
+  padding: 16px;
+  background: linear-gradient(135deg, #F8F9FA 0%, #E8F4F8 100%);
+  border-radius: 10px;
+  border-left: 4px solid #4A90E2;
+}
+
+.answer-question {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.q-icon {
+  width: 22px;
+  height: 22px;
+  background: #F5A623;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.answer-question span:last-child {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.answer-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.a-icon {
+  width: 22px;
+  height: 22px;
+  background: #4A90E2;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.answer-text span:last-child {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.6;
+}
+
+.answer-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255, 193, 7, 0.15);
+  border-radius: 6px;
+}
+
+.hint-icon {
+  font-size: 14px;
+}
+
+.answer-hint span:last-child {
+  font-size: 12px;
+  color: #F57C00;
+}
+
+.no-data-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 30px;
+  color: #999;
+  font-size: 14px;
+}
+
+.no-data-hint .hint-icon {
+  font-size: 20px;
 }
 
 .content-footer {
