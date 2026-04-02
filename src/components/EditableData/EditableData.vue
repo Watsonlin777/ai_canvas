@@ -429,6 +429,33 @@
             </div>
           </div>
           
+          <div class="exclude-options">
+            <div class="exclude-header">
+              <span class="exclude-title">🎯 数据排除选项</span>
+              <button class="btn-reset-exclude" @click="resetExcludeOptions" title="重置排除选项">
+                🔄
+              </button>
+            </div>
+            <div class="exclude-grid">
+              <label class="exclude-item">
+                <input type="checkbox" v-model="excludeOptions.excludeZero" />
+                <span class="exclude-label">排除 0 值</span>
+              </label>
+              <label class="exclude-item">
+                <input type="checkbox" v-model="excludeOptions.excludeMax" />
+                <span class="exclude-label">排除最大值</span>
+              </label>
+              <label class="exclude-item">
+                <input type="checkbox" v-model="excludeOptions.excludeMin" />
+                <span class="exclude-label">排除最小值</span>
+              </label>
+              <label class="exclude-item">
+                <input type="checkbox" v-model="excludeOptions.excludeOutliers" />
+                <span class="exclude-label">排除异常值</span>
+              </label>
+            </div>
+          </div>
+          
           <div class="scene-info" v-if="getSceneType() !== 'default'">
             <span class="scene-icon">🎯</span>
             <span class="scene-text">场景识别: {{ getSceneBasedPredictionConfig(getSceneType()).description }}</span>
@@ -469,6 +496,10 @@
             <div class="metric-item">
               <span class="metric-label">算法类型</span>
               <span class="metric-value">{{ predictionResult.algorithm === 'linear' ? '线性回归' : '多项式拟合' }}</span>
+            </div>
+            <div class="metric-item" v-if="predictionResult.filteredCount !== predictionResult.originalCount">
+              <span class="metric-label">使用数据</span>
+              <span class="metric-value">{{ predictionResult.filteredCount }} / {{ predictionResult.originalCount }}</span>
             </div>
           </div>
           
@@ -538,6 +569,13 @@ const predictionCount = ref(3)
 const predictionAlgorithm = ref('linear')
 const isPredicting = ref(false)
 const predictionResult = ref(null)
+
+const excludeOptions = ref({
+  excludeZero: false,
+  excludeMax: false,
+  excludeMin: false,
+  excludeOutliers: false
+})
 
 const showStatsControl = ref(false)
 const showStatCount = ref(true)
@@ -623,6 +661,45 @@ function getAllValues() {
   }
   
   return values
+}
+
+function getFilteredValues() {
+  let values = getAllValues()
+  
+  if (values.length === 0) return values
+  
+  if (excludeOptions.value.excludeZero) {
+    values = values.filter(v => v !== 0)
+  }
+  
+  if (excludeOptions.value.excludeMax && values.length > 0) {
+    const maxVal = Math.max(...values)
+    values = values.filter(v => v !== maxVal)
+  }
+  
+  if (excludeOptions.value.excludeMin && values.length > 0) {
+    const minVal = Math.min(...values)
+    values = values.filter(v => v !== minVal)
+  }
+  
+  if (excludeOptions.value.excludeOutliers && values.length > 2) {
+    const mean = values.reduce((a, b) => a + b, 0) / values.length
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length
+    const stdDev = Math.sqrt(variance)
+    const threshold = 2 * stdDev
+    values = values.filter(v => Math.abs(v - mean) <= threshold)
+  }
+  
+  return values
+}
+
+function resetExcludeOptions() {
+  excludeOptions.value = {
+    excludeZero: false,
+    excludeMax: false,
+    excludeMin: false,
+    excludeOutliers: false
+  }
 }
 
 function loadData() {
@@ -903,7 +980,14 @@ function runAIPredictionForData() {
   isPredicting.value = true
   
   setTimeout(() => {
-    const values = getAllValues()
+    const values = getFilteredValues()
+    
+    if (values.length < 2) {
+      alert('排除后的数据不足2个，无法进行预测。请调整排除选项。')
+      isPredicting.value = false
+      return
+    }
+    
     const sceneType = getSceneType()
     const config = getSceneBasedPredictionConfig(sceneType)
     
@@ -916,7 +1000,9 @@ function runAIPredictionForData() {
     predictionResult.value = {
       ...result,
       sceneDescription: config.description,
-      unit: config.unit
+      unit: config.unit,
+      filteredCount: values.length,
+      originalCount: getAllValues().length
     }
     
     isPredicting.value = false
@@ -1953,6 +2039,83 @@ onMounted(() => {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.exclude-options {
+  margin-bottom: 16px;
+  padding: 14px;
+  background: linear-gradient(135deg, #FFF9E6 0%, #FFF3CD 100%);
+  border-radius: 8px;
+  border: 1px solid #FFE082;
+}
+
+.exclude-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.exclude-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #F5A623;
+}
+
+.btn-reset-exclude {
+  width: 28px;
+  height: 28px;
+  background: white;
+  border: 1px solid #FFE082;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.btn-reset-exclude:hover {
+  background: #FFE082;
+  transform: scale(1.1);
+}
+
+.exclude-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.exclude-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.exclude-item:hover {
+  border-color: #F5A623;
+  transform: translateY(-1px);
+}
+
+.exclude-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #F5A623;
+}
+
+.exclude-label {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+  user-select: none;
 }
 
 .scene-info {
