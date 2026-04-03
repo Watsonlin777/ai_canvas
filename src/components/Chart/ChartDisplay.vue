@@ -315,9 +315,18 @@ function handleChartClick(params) {
 }
 
 function handleMouseDown(params) {
-  if (!enableDrag.value) return
-  if (params.componentType !== 'series') return
-  if (chartStore.chartType !== 'bar') return
+  if (!enableDrag.value) {
+    console.log('[ChartDisplay Drag] Drag disabled, returning')
+    return
+  }
+  if (params.componentType !== 'series') {
+    console.log('[ChartDisplay Drag] Not a series component, returning')
+    return
+  }
+  if (chartStore.chartType !== 'bar') {
+    console.log('[ChartDisplay Drag] Only bar chart supports drag, returning')
+    return
+  }
   
   isDragging.value = true
   dragIndex.value = params.dataIndex
@@ -335,16 +344,45 @@ function handleMouseDown(params) {
       const rect = chartContainer.value.getBoundingClientRect()
       const chartInstance = chartRef.value?.chart
       
-      if (!chartInstance) return
+      if (!chartInstance) {
+        console.log('[ChartDisplay Drag] No chartInstance in handleMouseMove')
+        return
+      }
       
       try {
         const model = chartInstance.getModel()
         const grid = model.getComponent('grid')
-        if (!grid || !grid.coordinateSystem || typeof grid.coordinateSystem.getArea !== 'function') return
+        if (!grid) {
+          console.log('[ChartDisplay Drag] Grid component not found')
+          return
+        }
         
-        const gridRect = grid.coordinateSystem.getArea()
+        // 获取 grid 的矩形区域 - 尝试多种方式
+        let gridRect = null
+        
+        // 方式1: 通过 coordinateSystem.getArea()
+        if (grid.coordinateSystem && typeof grid.coordinateSystem.getArea === 'function') {
+          gridRect = grid.coordinateSystem.getArea()
+        }
+        // 方式2: 通过 coordinateSystem.getRect()
+        else if (grid.coordinateSystem && typeof grid.coordinateSystem.getRect === 'function') {
+          gridRect = grid.coordinateSystem.getRect()
+        }
+        // 方式3: 直接从 grid 对象获取
+        else if (grid.getRect && typeof grid.getRect === 'function') {
+          gridRect = grid.getRect()
+        }
+        
+        if (!gridRect) {
+          console.log('[ChartDisplay Drag] Cannot get grid rect')
+          return
+        }
+        
         const yAxis = model.getComponent('yAxis')
-        if (!yAxis || !yAxis.axis) return
+        if (!yAxis || !yAxis.axis) {
+          console.log('[ChartDisplay Drag] YAxis not ready')
+          return
+        }
         
         const extent = yAxis.axis.getExtent()
         const maxValue = extent[1]
@@ -389,10 +427,19 @@ function handleMouseDown(params) {
 }
 
 function handleTouchStart(params) {
-  if (!enableDrag.value) return
-  if (params.componentType !== 'series') return
-  if (chartStore.chartType !== 'bar') return
   
+  if (!enableDrag.value) {
+    console.log('[ChartDisplay Drag Touch] Drag disabled, returning')
+    return
+  }
+  if (params.componentType !== 'series') {
+    console.log('[ChartDisplay Drag Touch] Not a series component, returning')
+    return
+  }
+  if (chartStore.chartType !== 'bar') {
+    console.log('[ChartDisplay Drag Touch] Only bar chart supports drag, returning')
+    return
+  }
   isDragging.value = true
   dragIndex.value = params.dataIndex
   
@@ -417,16 +464,45 @@ function handleTouchStart(params) {
     const rect = chartContainer.value.getBoundingClientRect()
     const chartInstance = chartRef.value?.chart
     
-    if (!chartInstance) return
+    if (!chartInstance) {
+      console.log('[ChartDisplay Drag Touch] No chartInstance in handleTouchMove')
+      return
+    }
     
     try {
       const model = chartInstance.getModel()
       const grid = model.getComponent('grid')
-      if (!grid || !grid.coordinateSystem || typeof grid.coordinateSystem.getArea !== 'function') return
+      if (!grid) {
+        console.log('[ChartDisplay Drag Touch] Grid component not found')
+        return
+      }
       
-      const gridRect = grid.coordinateSystem.getArea()
+      // 获取 grid 的矩形区域 - 尝试多种方式
+      let gridRect = null
+      
+      // 方式1: 通过 coordinateSystem.getArea()
+      if (grid.coordinateSystem && typeof grid.coordinateSystem.getArea === 'function') {
+        gridRect = grid.coordinateSystem.getArea()
+      }
+      // 方式2: 通过 coordinateSystem.getRect()
+      else if (grid.coordinateSystem && typeof grid.coordinateSystem.getRect === 'function') {
+        gridRect = grid.coordinateSystem.getRect()
+      }
+      // 方式3: 直接从 grid 对象获取
+      else if (grid.getRect && typeof grid.getRect === 'function') {
+        gridRect = grid.getRect()
+      }
+      
+      if (!gridRect) {
+        console.log('[ChartDisplay Drag Touch] Cannot get grid rect')
+        return
+      }
+      
       const yAxis = model.getComponent('yAxis')
-      if (!yAxis || !yAxis.axis) return
+      if (!yAxis || !yAxis.axis) {
+        console.log('[ChartDisplay Drag Touch] YAxis not ready')
+        return
+      }
       
       const extent = yAxis.axis.getExtent()
       const maxValue = extent[1]
@@ -438,6 +514,7 @@ function handleTouchStart(params) {
       const ratio = 1 - (relativeY / chartHeight)
       const newValue = Math.round(minValue + ratio * (maxValue - minValue))
       const clampedValue = Math.max(minValue, Math.min(maxValue, newValue))
+      
       
       if (clampedValue >= 0 && dragIndex.value >= 0) {
         chartStore.updateDataItem(dragIndex.value, 'value', Math.max(0, clampedValue))

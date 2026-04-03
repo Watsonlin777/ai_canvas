@@ -838,12 +838,24 @@ function handleChartClick(params) {
 }
 
 function handleMouseDown(params) {
-  if (!enableDrag.value) return
-  if (params.componentType !== 'series') return
-  if (chartType.value === 'pie') return
+  if (!enableDrag.value) {
+    console.log('[Drag] Drag disabled, returning')
+    return
+  }
+  if (params.componentType !== 'series') {
+    console.log('[Drag] Not a series component, returning')
+    return
+  }
+  if (chartType.value === 'pie') {
+    console.log('[Drag] Pie chart does not support drag, returning')
+    return
+  }
   
   const seriesType = params.seriesType
-  if (seriesType !== 'bar' && seriesType !== 'line' && seriesType !== 'scatter') return
+  if (seriesType !== 'bar' && seriesType !== 'line' && seriesType !== 'scatter') {
+    console.log('[Drag] Series type not supported:', seriesType)
+    return
+  }
   
   dragIndex.value = params.dataIndex
   dragValue.value = params.value
@@ -862,16 +874,44 @@ function handleMouseDown(params) {
     const rect = chartContainer.value.getBoundingClientRect()
     const chartInstance = chartRef.value?.chart
     
-    if (!chartInstance) return
+    if (!chartInstance) {
+      console.log('[Drag] No chartInstance in handleMouseMove')
+      return
+    }
     
     try {
       const model = chartInstance.getModel()
       const grid = model.getComponent('grid')
-      if (!grid || !grid.coordinateSystem || typeof grid.coordinateSystem.getArea !== 'function') return
+      if (!grid) {
+        console.log('[Drag] Grid component not found')
+        return
+      }
       
-      const gridRect = grid.coordinateSystem.getArea()
+      // 获取 grid 的矩形区域 - 尝试多种方式
+      let gridRect = null
+      
+      // 方式1: 通过 coordinateSystem.getArea()
+      if (grid.coordinateSystem && typeof grid.coordinateSystem.getArea === 'function') {
+        gridRect = grid.coordinateSystem.getArea()
+      }
+      // 方式2: 通过 coordinateSystem.getRect()
+      else if (grid.coordinateSystem && typeof grid.coordinateSystem.getRect === 'function') {
+        gridRect = grid.coordinateSystem.getRect()
+      }
+      // 方式3: 直接从 grid 对象获取
+      else if (grid.getRect && typeof grid.getRect === 'function') {
+        gridRect = grid.getRect()
+      }
+      
+      if (!gridRect) {
+        console.log('[Drag] Cannot get grid rect, grid:', grid)
+        return
+      }
       const yAxis = model.getComponent('yAxis')
-      if (!yAxis || !yAxis.axis) return
+      if (!yAxis || !yAxis.axis) {
+        console.log('[Drag] YAxis not ready in handleMouseMove')
+        return
+      }
       
       const extent = yAxis.axis.getExtent()
       const maxValue = extent[1]
@@ -912,12 +952,33 @@ function handleMouseDown(params) {
 }
 
 function handleTouchStart(params) {
-  if (!enableDrag.value) return
-  if (params.componentType !== 'series') return
-  if (chartType.value === 'pie') return
+  console.log('[Drag Touch] handleTouchStart triggered', {
+    enableDrag: enableDrag.value,
+    componentType: params.componentType,
+    seriesType: params.seriesType,
+    dataIndex: params.dataIndex,
+    value: params.value,
+    chartType: chartType.value
+  })
+  
+  if (!enableDrag.value) {
+    console.log('[Drag Touch] Drag disabled, returning')
+    return
+  }
+  if (params.componentType !== 'series') {
+    console.log('[Drag Touch] Not a series component, returning')
+    return
+  }
+  if (chartType.value === 'pie') {
+    console.log('[Drag Touch] Pie chart does not support drag, returning')
+    return
+  }
   
   const seriesType = params.seriesType
-  if (seriesType !== 'bar' && seriesType !== 'line' && seriesType !== 'scatter') return
+  if (seriesType !== 'bar' && seriesType !== 'line' && seriesType !== 'scatter') {
+    console.log('[Drag Touch] Series type not supported:', seriesType)
+    return
+  }
   
   dragIndex.value = params.dataIndex
   dragValue.value = params.value
@@ -948,11 +1009,37 @@ function handleTouchStart(params) {
     try {
       const model = chartInstance.getModel()
       const grid = model.getComponent('grid')
-      if (!grid || !grid.coordinateSystem || typeof grid.coordinateSystem.getArea !== 'function') return
+      if (!grid) {
+        console.log('[Drag Touch] Grid component not found')
+        return
+      }
       
-      const gridRect = grid.coordinateSystem.getArea()
+      // 获取 grid 的矩形区域 - 尝试多种方式
+      let gridRect = null
+      
+      // 方式1: 通过 coordinateSystem.getArea()
+      if (grid.coordinateSystem && typeof grid.coordinateSystem.getArea === 'function') {
+        gridRect = grid.coordinateSystem.getArea()
+      }
+      // 方式2: 通过 coordinateSystem.getRect()
+      else if (grid.coordinateSystem && typeof grid.coordinateSystem.getRect === 'function') {
+        gridRect = grid.coordinateSystem.getRect()
+      }
+      // 方式3: 直接从 grid 对象获取
+      else if (grid.getRect && typeof grid.getRect === 'function') {
+        gridRect = grid.getRect()
+      }
+      
+      if (!gridRect) {
+        console.log('[Drag Touch] Cannot get grid rect')
+        return
+      }
+      
       const yAxis = model.getComponent('yAxis')
-      if (!yAxis || !yAxis.axis) return
+      if (!yAxis || !yAxis.axis) {
+        console.log('[Drag Touch] YAxis not ready')
+        return
+      }
       
       const extent = yAxis.axis.getExtent()
       const maxValue = extent[1]
@@ -998,7 +1085,10 @@ function handleTouchStart(params) {
 
 function updateDataValue(index, value) {
   const data = props.data?.data
-  if (!data) return
+  if (!data) {
+    console.log('[Drag] No data found')
+    return
+  }
   
   if (props.viewMode === 'flat') {
     if (data[index]) {
