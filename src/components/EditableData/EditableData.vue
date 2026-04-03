@@ -64,6 +64,12 @@
             <span class="toggle-knob"></span>
           </button>
         </div>
+        <div class="setting-item">
+          <label class="setting-label">显示数据编辑器</label>
+          <button :class="['toggle-switch', { on: showDataEditor }]" @click="showDataEditor = !showDataEditor">
+            <span class="toggle-knob"></span>
+          </button>
+        </div>
       </div>
     </div>
     
@@ -74,7 +80,7 @@
       </div>
     </div>
     
-    <div class="data-editor">
+    <div class="data-editor" v-if="showDataEditor">
       <div v-if="dataType === 'table'" class="table-editor">
         <div class="view-mode-switch" v-if="showViewSwitch">
           <button 
@@ -561,6 +567,7 @@ const showDescription = ref(true)
 const allowDelete = ref(true)
 const allowDeleteCol = ref(true)
 const showViewSwitch = ref(true)
+const showDataEditor = ref(true)
 const viewMode = ref('table')
 const flatData = ref([])
 
