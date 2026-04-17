@@ -1,20 +1,46 @@
 <template>
-  <div class="editable-data-manager">
-    <div class="data-manager-header">
+  <div 
+    class="editable-data-manager" 
+    :class="{ 
+      'is-dragging': isDragging, 
+      'is-resizing': isResizing,
+      'is-maximized': isMaximized,
+      'draggable-panel': true
+    }"
+    ref="panelRef"
+    :style="panelStyle"
+  >
+    <div class="resize-handles" v-if="!isMaximized">
+      <div 
+        v-for="handle in resizeHandles" 
+        :key="handle.direction"
+        :class="['resize-handle', handle.class]"
+        :style="{ cursor: handle.cursor }"
+        @mousedown="(e) => startResize(e, handle.direction)"
+      ></div>
+    </div>
+    
+    <div class="data-manager-header" ref="headerRef" @mousedown="startDrag">
       <div class="header-left">
+        <span class="drag-indicator" title="拖拽移动">⋮⋮</span>
         <h3 class="section-title">📝 数据编辑</h3>
-        <button class="btn-toggle" @click="showSettings = !showSettings" :title="showSettings ? '收起设置' : '展开设置'">
+        <button class="btn-toggle" @click.stop="showSettings = !showSettings" :title="showSettings ? '收起设置' : '展开设置'">
           <span :class="['toggle-icon', { rotated: showSettings }]">▼</span>
         </button>
       </div>
+      <div class="header-actions">
+        <button class="btn-maximize" @click.stop="toggleMaximize" :title="isMaximized ? '退出全屏' : '全屏显示'">
+          {{ isMaximized ? '⤓' : '⤢' }}
+        </button>
+      </div>
       <div class="data-actions">
-        <button class="btn btn-sm btn-primary" @click="addColumn" v-if="dataType === 'table'">
+        <button class="btn btn-sm btn-primary" @click.stop="addColumn" v-if="dataType === 'table'">
           ➕ 添加列
         </button>
-        <button class="btn btn-sm btn-primary" @click="addRow">
+        <button class="btn btn-sm btn-primary" @click.stop="addRow">
           ➕ 添加行
         </button>
-        <button class="btn btn-sm btn-secondary" @click="resetData">
+        <button class="btn btn-sm btn-secondary" @click.stop="resetData">
           🔄 重置
         </button>
       </div>
@@ -544,6 +570,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { runAIPrediction, getSceneBasedPredictionConfig } from '../../utils/helpers'
+import { useDraggablePanel, createResizeHandles } from '../../utils/useDraggablePanel'
 
 const props = defineProps({
   scene: {
@@ -553,6 +580,27 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['dataChange', 'viewModeChange'])
+
+const {
+  panelRef,
+  headerRef,
+  isDragging,
+  isResizing,
+  isMaximized,
+  position,
+  size,
+  panelStyle,
+  startDrag,
+  startResize,
+  toggleMaximize
+} = useDraggablePanel({
+  minWidth: 400,
+  minHeight: 300,
+  initialWidth: null,
+  initialHeight: null
+})
+
+const resizeHandles = createResizeHandles()
 
 const dataType = ref('table')
 const valueKey = ref('value')
@@ -1102,6 +1150,139 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
+.editable-data-manager.draggable-panel {
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+
+.editable-data-manager.is-dragging {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  cursor: grabbing;
+  user-select: none;
+}
+
+.editable-data-manager.is-resizing {
+  user-select: none;
+}
+
+.editable-data-manager.is-maximized {
+  border-radius: 0;
+  z-index: 9999;
+}
+
+.resize-handles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.resize-handle {
+  position: absolute;
+  pointer-events: auto;
+  background: transparent;
+}
+
+.resize-handle-n {
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+}
+
+.resize-handle-s {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+}
+
+.resize-handle-e {
+  right: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+}
+
+.resize-handle-w {
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+}
+
+.resize-handle-ne {
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle-nw {
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle-se {
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle:hover {
+  background: rgba(74, 144, 226, 0.2);
+}
+
+.drag-indicator {
+  cursor: grab;
+  color: #999;
+  font-size: 14px;
+  padding: 4px;
+  user-select: none;
+}
+
+.drag-indicator:hover {
+  color: #4A90E2;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+}
+
+.btn-maximize {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  color: white;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-maximize:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+}
+
 .data-manager-header {
   display: flex;
   justify-content: space-between;
@@ -1109,6 +1290,11 @@ onMounted(() => {
   margin-bottom: 16px;
   padding-bottom: 16px;
   border-bottom: 2px solid #E1E4E8;
+  cursor: grab;
+}
+
+.data-manager-header:active {
+  cursor: grabbing;
 }
 
 .header-left {

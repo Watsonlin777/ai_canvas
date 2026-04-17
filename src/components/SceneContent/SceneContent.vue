@@ -18,10 +18,38 @@
           @viewModeChange="handleViewModeChange"
         />
         
-        <div class="questions-section">
-          <div class="section-header">
-            <div class="header-icon">💡</div>
-            <h3>探究问题</h3>
+        <div 
+          class="questions-section" 
+          :class="{ 
+            'is-dragging': isQuestionsDragging, 
+            'is-resizing': isQuestionsResizing,
+            'is-maximized': isQuestionsMaximized,
+            'draggable-panel': true
+          }"
+          ref="questionsPanelRef"
+          :style="questionsPanelStyle"
+        >
+          <div class="resize-handles" v-if="!isQuestionsMaximized">
+            <div 
+              v-for="handle in resizeHandles" 
+              :key="handle.direction"
+              :class="['resize-handle', handle.class]"
+              :style="{ cursor: handle.cursor }"
+              @mousedown="(e) => startQuestionsResize(e, handle.direction)"
+            ></div>
+          </div>
+          
+          <div class="section-header" ref="questionsHeaderRef" @mousedown="startQuestionsDrag">
+            <div class="header-left-area">
+              <span class="drag-indicator" title="拖拽移动">⋮⋮</span>
+              <div class="header-icon">💡</div>
+              <h3>探究问题</h3>
+            </div>
+            <div class="header-actions">
+              <button class="btn-maximize" @click.stop="toggleQuestionsMaximize" :title="isQuestionsMaximized ? '退出全屏' : '全屏显示'">
+                {{ isQuestionsMaximized ? '⤓' : '⤢' }}
+              </button>
+            </div>
           </div>
           
           <div class="questions-list">
@@ -140,6 +168,7 @@ import { ref, reactive, watch, onMounted, computed } from 'vue'
 import EditableData from '../EditableData/EditableData.vue'
 import ChartGenerator from '../ChartGenerator/ChartGenerator.vue'
 import { getThinkingSkills, generateRealTimeAnswers, getSceneTypeFromTitle } from '../../utils/helpers'
+import { createResizeHandles } from '../../utils/useDraggablePanel'
 
 const props = defineProps({
   scene: {
@@ -159,6 +188,166 @@ const viewMode = ref('table')
 
 const showThinkingSkills = ref(false)
 const showRealTimeAnswers = ref(false)
+
+const resizeHandles = createResizeHandles()
+
+const questionsPanelRef = ref(null)
+const questionsHeaderRef = ref(null)
+const isQuestionsDragging = ref(false)
+const isQuestionsResizing = ref(false)
+const isQuestionsMaximized = ref(false)
+
+const questionsPosition = reactive({ x: 0, y: 0 })
+const questionsSize = reactive({ width: 600, height: 400 })
+const questionsSavedState = reactive({ x: 0, y: 0, width: 0, height: 0 })
+const questionsResizeDirection = ref('')
+const questionsDragStart = reactive({ x: 0, y: 0 })
+const questionsResizeStart = reactive({ x: 0, y: 0, width: 0, height: 0, left: 0, top: 0 })
+
+const questionsPanelStyle = computed(() => {
+  if (isQuestionsMaximized.value) {
+    return {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
+      zIndex: 9999
+    }
+  }
+  return {
+    position: 'relative',
+    left: `${Math.round(questionsPosition.x)}px`,
+    top: `${Math.round(questionsPosition.y)}px`,
+    width: `${Math.round(questionsSize.width)}px`,
+    minHeight: `${Math.round(questionsSize.height)}px`
+  }
+})
+
+function startQuestionsDrag(e) {
+  if (isQuestionsMaximized.value) return
+  if (e.target.closest('.btn-toggle') || 
+      e.target.closest('.toggle-switch') || 
+      e.target.closest('button') ||
+      e.target.closest('input') ||
+      e.target.closest('select')) return
+  
+  isQuestionsDragging.value = true
+  questionsDragStart.x = e.clientX - questionsPosition.x
+  questionsDragStart.y = e.clientY - questionsPosition.y
+  
+  document.addEventListener('mousemove', onQuestionsDrag)
+  document.addEventListener('mouseup', stopQuestionsDrag)
+  
+  if (questionsPanelRef.value) {
+    questionsPanelRef.value.style.transition = 'none'
+  }
+}
+
+function onQuestionsDrag(e) {
+  if (!isQuestionsDragging.value) return
+  
+  const newX = e.clientX - questionsDragStart.x
+  const newY = e.clientY - questionsDragStart.y
+  
+  questionsPosition.x = Math.max(0, Math.min(newX, window.innerWidth - questionsSize.width))
+  questionsPosition.y = Math.max(0, Math.min(newY, window.innerHeight - questionsSize.height))
+}
+
+function stopQuestionsDrag() {
+  isQuestionsDragging.value = false
+  document.removeEventListener('mousemove', onQuestionsDrag)
+  document.removeEventListener('mouseup', stopQuestionsDrag)
+  
+  if (questionsPanelRef.value) {
+    questionsPanelRef.value.style.transition = ''
+  }
+}
+
+function startQuestionsResize(e, direction) {
+  if (isQuestionsMaximized.value) return
+  e.preventDefault()
+  e.stopPropagation()
+  
+  isQuestionsResizing.value = true
+  questionsResizeDirection.value = direction
+  
+  questionsResizeStart.x = e.clientX
+  questionsResizeStart.y = e.clientY
+  questionsResizeStart.width = questionsSize.width
+  questionsResizeStart.height = questionsSize.height
+  questionsResizeStart.left = questionsPosition.x
+  questionsResizeStart.top = questionsPosition.y
+  
+  document.addEventListener('mousemove', onQuestionsResize)
+  document.addEventListener('mouseup', stopQuestionsResize)
+  
+  if (questionsPanelRef.value) {
+    questionsPanelRef.value.style.transition = 'none'
+  }
+}
+
+function onQuestionsResize(e) {
+  if (!isQuestionsResizing.value) return
+  
+  const deltaX = e.clientX - questionsResizeStart.x
+  const deltaY = e.clientY - questionsResizeStart.y
+  const dir = questionsResizeDirection.value
+  
+  let newWidth = questionsResizeStart.width
+  let newHeight = questionsResizeStart.height
+  let newX = questionsResizeStart.left
+  let newY = questionsResizeStart.top
+  
+  if (dir.includes('e')) {
+    newWidth = Math.max(300, Math.min(window.innerWidth, questionsResizeStart.width + deltaX))
+  }
+  if (dir.includes('w')) {
+    const widthChange = Math.min(deltaX, questionsResizeStart.width - 300)
+    newWidth = questionsResizeStart.width - widthChange
+    newX = questionsResizeStart.left + widthChange
+  }
+  if (dir.includes('s')) {
+    newHeight = Math.max(200, Math.min(window.innerHeight, questionsResizeStart.height + deltaY))
+  }
+  if (dir.includes('n')) {
+    const heightChange = Math.min(deltaY, questionsResizeStart.height - 200)
+    newHeight = questionsResizeStart.height - heightChange
+    newY = questionsResizeStart.top + heightChange
+  }
+  
+  questionsSize.width = newWidth
+  questionsSize.height = newHeight
+  questionsPosition.x = newX
+  questionsPosition.y = newY
+}
+
+function stopQuestionsResize() {
+  isQuestionsResizing.value = false
+  questionsResizeDirection.value = ''
+  document.removeEventListener('mousemove', onQuestionsResize)
+  document.removeEventListener('mouseup', stopQuestionsResize)
+  
+  if (questionsPanelRef.value) {
+    questionsPanelRef.value.style.transition = ''
+  }
+}
+
+function toggleQuestionsMaximize() {
+  if (isQuestionsMaximized.value) {
+    questionsPosition.x = questionsSavedState.x
+    questionsPosition.y = questionsSavedState.y
+    questionsSize.width = questionsSavedState.width
+    questionsSize.height = questionsSavedState.height
+    isQuestionsMaximized.value = false
+  } else {
+    questionsSavedState.x = questionsPosition.x
+    questionsSavedState.y = questionsPosition.y
+    questionsSavedState.width = questionsSize.width
+    questionsSavedState.height = questionsSize.height
+    isQuestionsMaximized.value = true
+  }
+}
 
 const sceneType = computed(() => {
   return getSceneTypeFromTitle(currentScene.value.content?.title)
@@ -289,11 +478,156 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
+.questions-section.draggable-panel {
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+
+.questions-section.is-dragging {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  cursor: grabbing;
+  user-select: none;
+}
+
+.questions-section.is-resizing {
+  user-select: none;
+}
+
+.questions-section.is-maximized {
+  border-radius: 0;
+  z-index: 9999;
+}
+
+.resize-handles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.resize-handle {
+  position: absolute;
+  pointer-events: auto;
+  background: transparent;
+}
+
+.resize-handle-n {
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+}
+
+.resize-handle-s {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+}
+
+.resize-handle-e {
+  right: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+}
+
+.resize-handle-w {
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+}
+
+.resize-handle-ne {
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle-nw {
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle-se {
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle:hover {
+  background: rgba(74, 144, 226, 0.2);
+}
+
+.drag-indicator {
+  cursor: grab;
+  color: #999;
+  font-size: 14px;
+  padding: 4px;
+  user-select: none;
+}
+
+.drag-indicator:hover {
+  color: #4A90E2;
+}
+
+.header-left-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+}
+
+.btn-maximize {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  color: white;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-maximize:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+}
+
 .section-header {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 20px;
+  cursor: grab;
+}
+
+.section-header:active {
+  cursor: grabbing;
 }
 
 .header-icon {

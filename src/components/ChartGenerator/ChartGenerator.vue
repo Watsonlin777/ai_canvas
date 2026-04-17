@@ -1,30 +1,56 @@
 <template>
-  <div class="chart-generator">
-    <div class="chart-header">
+  <div 
+    class="chart-generator" 
+    :class="{ 
+      'is-dragging': isDragging, 
+      'is-resizing': isResizing,
+      'is-maximized': isMaximized,
+      'draggable-panel': true
+    }"
+    ref="panelRef"
+    :style="panelStyle"
+  >
+    <div class="resize-handles" v-if="!isMaximized">
+      <div 
+        v-for="handle in resizeHandles" 
+        :key="handle.direction"
+        :class="['resize-handle', handle.class]"
+        :style="{ cursor: handle.cursor }"
+        @mousedown="(e) => startResize(e, handle.direction)"
+      ></div>
+    </div>
+    
+    <div class="chart-header" ref="headerRef" @mousedown="startDrag">
       <div class="header-left">
+        <span class="drag-indicator" title="拖拽移动">⋮⋮</span>
         <h3 class="chart-title">📊 数据可视化</h3>
-        <button class="btn-toggle" @click="showSettings = !showSettings" :title="showSettings ? '收起设置' : '展开设置'">
+        <button class="btn-toggle" @click.stop="showSettings = !showSettings" :title="showSettings ? '收起设置' : '展开设置'">
           <span :class="['toggle-icon', { rotated: showSettings }]">▼</span>
+        </button>
+      </div>
+      <div class="header-actions">
+        <button class="btn-maximize" @click.stop="toggleMaximize" :title="isMaximized ? '退出全屏' : '全屏显示'">
+          {{ isMaximized ? '⤓' : '⤢' }}
         </button>
       </div>
       <div class="chart-controls">
         <button 
           :class="['chart-type-btn', { active: chartType === 'bar' }]"
-          @click="chartType = 'bar'"
+          @click.stop="chartType = 'bar'"
           title="柱状图"
         >
           📊
         </button>
         <button 
           :class="['chart-type-btn', { active: chartType === 'line' }]"
-          @click="chartType = 'line'"
+          @click.stop="chartType = 'line'"
           title="折线图"
         >
           📈
         </button>
         <button 
           :class="['chart-type-btn', { active: chartType === 'pie' }]"
-          @click="chartType = 'pie'"
+          @click.stop="chartType = 'pie'"
           title="饼图"
         >
           🥧
@@ -32,7 +58,7 @@
         <button 
           class="chart-type-btn btn-refresh"
           :class="{ refreshing: isRefreshing }"
-          @click="refreshChart"
+          @click.stop="refreshChart"
           title="刷新图表"
         >
           🔄
@@ -145,6 +171,7 @@ import {
 } from 'echarts/components'
 import VChart from 'vue-echarts'
 import { useChartDrag, createDragFeedback, animateValueChange } from '../../utils/chartDrag'
+import { useDraggablePanel, createResizeHandles } from '../../utils/useDraggablePanel'
 
 use([
   CanvasRenderer,
@@ -174,6 +201,27 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['dataChange'])
+
+const {
+  panelRef,
+  headerRef,
+  isDragging,
+  isResizing,
+  isMaximized,
+  position,
+  size,
+  panelStyle,
+  startDrag,
+  startResize,
+  toggleMaximize
+} = useDraggablePanel({
+  minWidth: 400,
+  minHeight: 300,
+  initialWidth: null,
+  initialHeight: null
+})
+
+const resizeHandles = createResizeHandles()
 
 const chartRef = ref(null)
 const chartContainer = ref(null)
@@ -1159,6 +1207,139 @@ watch(showEdgeWarning, (newValue) => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
+.chart-generator.draggable-panel {
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+
+.chart-generator.is-dragging {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  cursor: grabbing;
+  user-select: none;
+}
+
+.chart-generator.is-resizing {
+  user-select: none;
+}
+
+.chart-generator.is-maximized {
+  border-radius: 0;
+  z-index: 9999;
+}
+
+.resize-handles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.resize-handle {
+  position: absolute;
+  pointer-events: auto;
+  background: transparent;
+}
+
+.resize-handle-n {
+  top: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+}
+
+.resize-handle-s {
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 6px;
+}
+
+.resize-handle-e {
+  right: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+}
+
+.resize-handle-w {
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+}
+
+.resize-handle-ne {
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle-nw {
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle-se {
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle-sw {
+  bottom: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.resize-handle:hover {
+  background: rgba(74, 144, 226, 0.2);
+}
+
+.drag-indicator {
+  cursor: grab;
+  color: #999;
+  font-size: 14px;
+  padding: 4px;
+  user-select: none;
+}
+
+.drag-indicator:hover {
+  color: #4A90E2;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  margin-right: 12px;
+}
+
+.btn-maximize {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  color: white;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-maximize:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+}
+
 .chart-header {
   display: flex;
   justify-content: space-between;
@@ -1166,6 +1347,11 @@ watch(showEdgeWarning, (newValue) => {
   margin-bottom: 20px;
   padding-bottom: 16px;
   border-bottom: 2px solid #E1E4E8;
+  cursor: grab;
+}
+
+.chart-header:active {
+  cursor: grabbing;
 }
 
 .header-left {
