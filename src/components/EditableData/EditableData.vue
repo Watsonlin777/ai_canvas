@@ -1152,6 +1152,64 @@ watch(() => props.scene, () => {
   loadData()
 }, { immediate: true, deep: true })
 
+let widthSyncSource = ref('table')
+
+const syncColumnWidthsFromHeader = () => {
+  if (!columnHeadersRef.value) return
+  
+  const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
+  const widths = []
+  
+  headerCells.forEach((cell, index) => {
+    widths[index] = cell.offsetWidth
+  })
+  
+  if (showRowHeaders.value && columnHeadersRef.value.querySelector('.corner-cell')) {
+    const cornerCell = columnHeadersRef.value.querySelector('.corner-cell')
+    widths[-1] = cornerCell.offsetWidth
+  }
+  
+  columnWidths.value = [...widths]
+  widthSyncSource.value = 'header'
+}
+
+const syncColumnWidthsFromTable = () => {
+  if (!tableRef.value) return
+  
+  const rows = tableRef.value.querySelectorAll('tr')
+  if (rows.length === 0) return
+  
+  const firstRow = rows[0]
+  const cells = firstRow.querySelectorAll('td.data-cell')
+  const widths = []
+  
+  cells.forEach((cell, index) => {
+    widths[index] = cell.offsetWidth
+  })
+  
+  if (widths.length > 0) {
+    columnWidths.value = [...widths]
+    
+    if (columnHeadersRef.value) {
+      const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
+      headerCells.forEach((cell, index) => {
+        if (widths[index]) {
+          cell.style.width = widths[index] + 'px'
+          cell.style.flex = 'none'
+          
+          const input = cell.querySelector('.header-input')
+          if (input) {
+            input.style.width = ''
+            input.style.minWidth = ''
+          }
+        }
+      })
+    }
+    
+    widthSyncSource.value = 'table'
+  }
+}
+
 watch(tableHeaders, () => {
   setTimeout(() => {
     if (columnHeadersRef.value) {
@@ -1174,64 +1232,6 @@ watch(tableHeaders, () => {
 
 onMounted(() => {
   loadData()
-  
-  let widthSyncSource = 'table'
-  
-  const syncColumnWidthsFromHeader = () => {
-    if (!columnHeadersRef.value) return
-    
-    const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
-    const widths = []
-    
-    headerCells.forEach((cell, index) => {
-      widths[index] = cell.offsetWidth
-    })
-    
-    if (showRowHeaders.value && columnHeadersRef.value.querySelector('.corner-cell')) {
-      const cornerCell = columnHeadersRef.value.querySelector('.corner-cell')
-      widths[-1] = cornerCell.offsetWidth
-    }
-    
-    columnWidths.value = [...widths]
-    widthSyncSource = 'header'
-  }
-  
-  const syncColumnWidthsFromTable = () => {
-    if (!tableRef.value) return
-    
-    const rows = tableRef.value.querySelectorAll('tr')
-    if (rows.length === 0) return
-    
-    const firstRow = rows[0]
-    const cells = firstRow.querySelectorAll('td.data-cell')
-    const widths = []
-    
-    cells.forEach((cell, index) => {
-      widths[index] = cell.offsetWidth
-    })
-    
-    if (widths.length > 0) {
-      columnWidths.value = [...widths]
-      
-      if (columnHeadersRef.value) {
-        const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
-        headerCells.forEach((cell, index) => {
-          if (widths[index]) {
-            cell.style.width = widths[index] + 'px'
-            cell.style.flex = 'none'
-            
-            const input = cell.querySelector('.header-input')
-            if (input) {
-              input.style.width = ''
-              input.style.minWidth = ''
-            }
-          }
-        })
-      }
-      
-      widthSyncSource = 'table'
-    }
-  }
   
   let isSyncing = false
   let scrollRAF = null
@@ -1278,7 +1278,7 @@ onMounted(() => {
         
         isCompactMode.value = width < totalMinWidth
         
-        if (widthSyncSource !== 'table') {
+        if (widthSyncSource.value !== 'table') {
           syncColumnWidthsFromHeader()
         }
       }
@@ -1291,7 +1291,7 @@ onMounted(() => {
   
   if (tableWrapperRef.value) {
     tableResizeObserver = new ResizeObserver(() => {
-      if (widthSyncSource !== 'header') {
+      if (widthSyncSource.value !== 'header') {
         syncColumnWidthsFromTable()
       }
     })
@@ -2034,7 +2034,7 @@ onMounted(() => {
 }
 
 .action-cell {
-  height: 48px;
+  height: 41px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2047,8 +2047,8 @@ onMounted(() => {
 }
 
 .btn-delete {
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   background: #E74C3C;
   color: white;
   border: none;
