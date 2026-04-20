@@ -334,10 +334,13 @@ function handleMouseDown(params) {
   dragIndex.value = params.dataIndex
   
   if (!dragFeedback && chartContainer.value) {
+    const headerEl = chartContainer.value.querySelector('.chart-header')
     dragFeedback = createDragFeedback(chartContainer.value, {
       formatValue: (val) => val.toFixed(1),
       offset: 15,
-      showEdgeWarning: showEdgeWarning.value
+      showEdgeWarning: showEdgeWarning.value,
+      fixedContainer: headerEl || null,
+      fixedPosition: 'right'
     })
   }
   
@@ -465,10 +468,13 @@ function handleTouchStart(params) {
   dragIndex.value = params.dataIndex
   
   if (!dragFeedback && chartContainer.value) {
+    const headerEl = chartContainer.value.querySelector('.chart-header')
     dragFeedback = createDragFeedback(chartContainer.value, {
       formatValue: (val) => val.toFixed(1),
       offset: 15,
-      showEdgeWarning: showEdgeWarning.value
+      showEdgeWarning: showEdgeWarning.value,
+      fixedContainer: headerEl || null,
+      fixedPosition: 'right'
     })
   }
   
@@ -585,10 +591,13 @@ function convertToTableFormat(dataItems) {
 onMounted(() => {
   chartReady.value = true
   if (chartContainer.value) {
+    const headerEl = chartContainer.value.querySelector('.chart-header')
     dragFeedback = createDragFeedback(chartContainer.value, {
       formatValue: (val) => val.toFixed(1),
       offset: 15,
-      showEdgeWarning: showEdgeWarning.value
+      showEdgeWarning: showEdgeWarning.value,
+      fixedContainer: headerEl || null,
+      fixedPosition: 'right'
     })
   }
 })
@@ -609,7 +618,9 @@ watch(showEdgeWarning, (newValue) => {
     dragFeedback = createDragFeedback(chartContainer.value, {
       formatValue: (val) => val.toFixed(1),
       offset: 15,
-      showEdgeWarning: newValue
+      showEdgeWarning: newValue,
+      fixedContainer: chartContainer.value.querySelector('.chart-header') || null,
+      fixedPosition: 'right'
     })
   }
 })

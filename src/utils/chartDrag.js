@@ -193,12 +193,29 @@ export function createDragFeedback(container, options = {}) {
     offset = 10,
     duration = 200,
     edgeThreshold = 0.1,
-    showEdgeWarning = true
+    showEdgeWarning = true,
+    fixedContainer = null,
+    fixedPosition = 'center'
   } = options
   
   let feedbackEl = null
   let edgeIndicatorEl = null
   let styleEl = null
+  let targetContainer = fixedContainer || container
+  
+  function getFixedContainer() {
+    if (typeof fixedContainer === 'string') {
+      return document.querySelector(fixedContainer)
+    }
+    if (fixedContainer instanceof HTMLElement) {
+      return fixedContainer
+    }
+    if (!fixedContainer) {
+      const headerEl = container.querySelector('.chart-header')
+      if (headerEl) return headerEl
+    }
+    return container
+  }
   
   function injectStyles() {
     if (styleEl) return
@@ -208,45 +225,81 @@ export function createDragFeedback(container, options = {}) {
       @keyframes feedbackFadeIn {
         from {
           opacity: 0;
-          transform: translate(-50%, -100%) scale(0.8);
+          transform: translateY(-5px) scale(0.95);
         }
         to {
           opacity: 1;
-          transform: translate(-50%, -100%) scale(1);
+          transform: translateY(0) scale(1);
         }
       }
       
       @keyframes feedbackFadeOut {
         from {
           opacity: 1;
-          transform: translate(-50%, -100%) scale(1);
+          transform: translateY(0) scale(1);
         }
         to {
           opacity: 0;
-          transform: translate(-50%, -100%) scale(0.8);
+          transform: translateY(-5px) scale(0.95);
         }
       }
       
       @keyframes edgePulse {
         0%, 100% {
-          transform: translate(-50%, -100%) scale(1);
-          box-shadow: 0 4px 12px rgba(231, 76, 60, 0.6);
+          box-shadow: 0 2px 8px rgba(231, 76, 60, 0.4);
         }
         50% {
-          transform: translate(-50%, -100%) scale(1.05);
-          box-shadow: 0 6px 16px rgba(231, 76, 60, 0.8);
+          box-shadow: 0 4px 16px rgba(231, 76, 60, 0.6);
         }
       }
       
-      @keyframes edgeIndicatorFadeIn {
-        from {
-          opacity: 0;
-          transform: translateX(-50%) translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(-50%) translateY(0);
-        }
+      @keyframes valueChange {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.15); }
+        100% { transform: scale(1); }
+      }
+
+      .chart-drag-feedback-fixed {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 6px 14px;
+        border-radius: 16px;
+        font-size: 14px;
+        font-weight: 600;
+        box-shadow: 0 3px 10px rgba(102, 126, 234, 0.35);
+        pointer-events: none;
+        white-space: nowrap;
+        animation: feedbackFadeIn ${duration}ms ease;
+        z-index: 100;
+        transition: background 0.3s ease, box-shadow 0.3s ease;
+      }
+      
+      .chart-drag-feedback-fixed.edge-max {
+        background: linear-gradient(135deg, #E74C3C 0%, #C0392B 100%) !important;
+        animation: feedbackFadeIn ${duration}ms ease, edgePulse 0.8s ease-in-out infinite !important;
+      }
+      
+      .chart-drag-feedback-fixed.edge-min {
+        background: linear-gradient(135deg, #3498DB 0%, #2980B9 100%) !important;
+        animation: feedbackFadeIn ${duration}ms ease, edgePulse 0.8s ease-in-out infinite !important;
+      }
+      
+      .chart-drag-feedback-fixed .feedback-value {
+        animation: valueChange 0.25s ease;
+      }
+      
+      .chart-drag-feedback-fixed .feedback-label {
+        font-size: 11px;
+        opacity: 0.85;
+        font-weight: 500;
+      }
+      
+      .chart-drag-feedback-fixed .feedback-icon {
+        font-size: 12px;
       }
       
       .chart-drag-feedback {
@@ -314,38 +367,85 @@ export function createDragFeedback(container, options = {}) {
     const edgeState = getEdgeState(value, minValue, maxValue)
     
     feedbackEl = document.createElement('div')
-    feedbackEl.className = 'chart-drag-feedback'
-    feedbackEl.textContent = formatValue(value)
+    const isFixedMode = !!getFixedContainer()
     
-    let additionalClass = ''
-    if (edgeState === 'max') {
-      additionalClass = 'edge-max'
-    } else if (edgeState === 'min') {
-      additionalClass = 'edge-min'
+    if (isFixedMode) {
+      targetContainer = getFixedContainer()
+      feedbackEl.className = 'chart-drag-feedback-fixed'
+      
+      let additionalClass = ''
+      if (edgeState === 'max') {
+        additionalClass = 'edge-max'
+      } else if (edgeState === 'min') {
+        additionalClass = 'edge-min'
+      }
+      
+      feedbackEl.className += ` ${additionalClass}`
+      
+      feedbackEl.innerHTML = `
+        <span class="feedback-icon">📊</span>
+        <span class="feedback-label">当前值:</span>
+        <span class="feedback-value">${formatValue(value)}</span>
+      `
+      
+      const positionStyles = {
+        center: {
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)'
+        },
+        right: {
+          position: 'absolute',
+          right: '12px',
+          top: '50%',
+          transform: 'translateY(-50%)'
+        },
+        left: {
+          position: 'absolute',
+          left: '12px',
+          top: '50%',
+          transform: 'translateY(-50%)'
+        }
+      }
+      
+      Object.assign(feedbackEl.style, positionStyles[fixedPosition] || positionStyles.center)
+      
+      targetContainer.appendChild(feedbackEl)
+    } else {
+      feedbackEl.className = 'chart-drag-feedback'
+      feedbackEl.textContent = formatValue(value)
+      
+      let additionalClass = ''
+      if (edgeState === 'max') {
+        additionalClass = 'edge-max'
+      } else if (edgeState === 'min') {
+        additionalClass = 'edge-min'
+      }
+      
+      feedbackEl.className += ` ${additionalClass}`
+      feedbackEl.style.cssText = `
+        position: absolute;
+        left: ${x}px;
+        top: ${y - offset}px;
+        transform: translate(-50%, -100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 16px;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        pointer-events: none;
+        z-index: 9999;
+        white-space: nowrap;
+        animation: feedbackFadeIn ${duration}ms ease;
+      `
+      
+      container.appendChild(feedbackEl)
     }
     
-    feedbackEl.className += ` ${additionalClass}`
-    feedbackEl.style.cssText = `
-      position: absolute;
-      left: ${x}px;
-      top: ${y - offset}px;
-      transform: translate(-50%, -100%);
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 16px;
-      font-weight: 600;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-      pointer-events: none;
-      z-index: 9999;
-      white-space: nowrap;
-      animation: feedbackFadeIn ${duration}ms ease;
-    `
-    
-    container.appendChild(feedbackEl)
-    
-    if (edgeState && showEdgeWarning) {
+    if (edgeState && showEdgeWarning && !isFixedMode) {
       showEdgeIndicator(edgeState, x)
     }
   }
@@ -386,24 +486,42 @@ export function createDragFeedback(container, options = {}) {
   
   function update(value, x, y, minValue = 0, maxValue = 100) {
     if (feedbackEl) {
+      const isFixedMode = feedbackEl.classList.contains('chart-drag-feedback-fixed')
       const edgeState = getEdgeState(value, minValue, maxValue)
       
-      feedbackEl.textContent = formatValue(value)
-      feedbackEl.style.left = `${x}px`
-      feedbackEl.style.top = `${y - offset}px`
-      
-      feedbackEl.classList.remove('edge-max', 'edge-min')
-      if (edgeState === 'max') {
-        feedbackEl.classList.add('edge-max')
-      } else if (edgeState === 'min') {
-        feedbackEl.classList.add('edge-min')
-      }
-      
-      if (edgeState && showEdgeWarning) {
-        showEdgeIndicator(edgeState, x)
-      } else if (edgeIndicatorEl) {
-        edgeIndicatorEl.remove()
-        edgeIndicatorEl = null
+      if (isFixedMode) {
+        const valueEl = feedbackEl.querySelector('.feedback-value')
+        if (valueEl) {
+          valueEl.textContent = formatValue(value)
+          valueEl.style.animation = 'none'
+          void valueEl.offsetWidth
+          valueEl.style.animation = 'valueChange 0.25s ease'
+        }
+        
+        feedbackEl.classList.remove('edge-max', 'edge-min')
+        if (edgeState === 'max') {
+          feedbackEl.classList.add('edge-max')
+        } else if (edgeState === 'min') {
+          feedbackEl.classList.add('edge-min')
+        }
+      } else {
+        feedbackEl.textContent = formatValue(value)
+        feedbackEl.style.left = `${x}px`
+        feedbackEl.style.top = `${y - offset}px`
+        
+        feedbackEl.classList.remove('edge-max', 'edge-min')
+        if (edgeState === 'max') {
+          feedbackEl.classList.add('edge-max')
+        } else if (edgeState === 'min') {
+          feedbackEl.classList.add('edge-min')
+        }
+        
+        if (edgeState && showEdgeWarning) {
+          showEdgeIndicator(edgeState, x)
+        } else if (edgeIndicatorEl) {
+          edgeIndicatorEl.remove()
+          edgeIndicatorEl = null
+        }
       }
     } else {
       show(value, x, y, minValue, maxValue)
@@ -413,7 +531,11 @@ export function createDragFeedback(container, options = {}) {
   return {
     show,
     hide,
-    update
+    update,
+    setFixedContainer: (newContainer) => {
+      fixedContainer = newContainer
+    },
+    getTargetContainer: () => targetContainer
   }
 }
 
