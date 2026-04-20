@@ -658,7 +658,8 @@ const editableData = ref({
   rows: [],
   categories: [],
   ranges: [],
-  data: []
+  data: [],
+  objectArray: []
 })
 
 const dataCount = computed(() => {
@@ -670,6 +671,8 @@ const dataCount = computed(() => {
     return editableData.value.ranges.length
   } else if (dataType.value === 'daily') {
     return editableData.value.data.length
+  } else if (dataType.value === 'objectArray') {
+    return editableData.value.objectArray.length
   }
   return 0
 })
@@ -691,7 +694,8 @@ function getDataDescription() {
     table: '表格数据编辑 - 每个单元格可输入数值，支持添加/删除行列',
     categories: '分类数据编辑 - 输入类别名称和对应数值',
     ranges: '范围数据编辑 - 输入数值范围和对应人数',
-    daily: '时间序列数据编辑 - 输入时间标签和对应数值'
+    daily: '时间序列数据编辑 - 输入时间标签和对应数值',
+    objectArray: '对象数组编辑 - 显示对象属性，支持多列数据'
   }
   return descriptions[dataType.value] || '数据编辑'
 }
@@ -727,6 +731,14 @@ function getAllValues() {
     editableData.value.data.forEach(item => {
       const val = item[valueKey.value]
       if (val !== null && val !== undefined && !isNaN(val)) values.push(Number(val))
+    })
+  } else if (dataType.value === 'objectArray') {
+    editableData.value.objectArray.forEach(item => {
+      Object.values(item).forEach(val => {
+        if (val !== null && val !== undefined && typeof val === 'number' && !isNaN(val)) {
+          values.push(Number(val))
+        }
+      })
     })
   }
   
@@ -778,24 +790,99 @@ function loadData() {
   if (content.data && Array.isArray(content.data[0])) {
     dataType.value = 'table'
     editableData.value.rows = content.data.map(row => [...row])
-    tableHeaders.value = content.data[0].map((_, i) => `列${i + 1}`)
-    rowHeaders.value = content.data.map((_, i) => `行${i + 1}`)
+    
+    if (content.headers?.columns) {
+      tableHeaders.value = [...content.headers.columns]
+    } else {
+      tableHeaders.value = content.data[0].map((_, i) => `列${i + 1}`)
+    }
+    
+    if (content.headers?.rows) {
+      rowHeaders.value = [...content.headers.rows]
+    } else {
+      rowHeaders.value = content.data.map((_, i) => `行${i + 1}`)
+    }
   } else if (content.categories) {
     dataType.value = 'categories'
     editableData.value.categories = content.categories.map(item => ({ ...item }))
+    
+    if (content.headers?.columns) {
+      tableHeaders.value = [...content.headers.columns]
+    } else {
+      tableHeaders.value = content.categories.map(item => item.name || '未命名')
+    }
+    
+    if (content.headers?.rows) {
+      rowHeaders.value = [...content.headers.rows]
+    } else {
+      rowHeaders.value = ['金额', '占比']
+    }
   } else if (content.ranges) {
     dataType.value = 'ranges'
     editableData.value.ranges = content.ranges.map(item => ({ ...item }))
+    
+    if (content.headers?.columns) {
+      tableHeaders.value = [...content.headers.columns]
+    } else {
+      tableHeaders.value = content.ranges.map(item => item.range || '未分类')
+    }
+    
+    if (content.headers?.rows) {
+      rowHeaders.value = [...content.headers.rows]
+    } else {
+      rowHeaders.value = ['人数', '占比']
+    }
   } else if (content.data && Array.isArray(content.data) && content.data[0]?.day) {
     dataType.value = 'daily'
     editableData.value.data = content.data.map(item => ({ ...item }))
     valueKey.value = Object.keys(content.data[0]).find(k => k !== 'day')
+    
+    if (content.headers?.columns) {
+      tableHeaders.value = [...content.headers.columns]
+    } else {
+      tableHeaders.value = content.data.map(item => item.day || '未知')
+    }
+    
+    if (content.headers?.rows) {
+      rowHeaders.value = [...content.headers.rows]
+    } else {
+      rowHeaders.value = ['数值']
+    }
   } else if (content.tables) {
     dataType.value = 'table'
     const firstTable = content.tables[0]?.data || []
     editableData.value.rows = firstTable.map(row => [...row])
-    tableHeaders.value = firstTable[0]?.map((_, i) => `列${i + 1}`) || []
-    rowHeaders.value = firstTable.map((_, i) => `行${i + 1}`) || []
+    
+    if (content.headers?.columns) {
+      tableHeaders.value = [...content.headers.columns]
+    } else {
+      tableHeaders.value = firstTable[0]?.map((_, i) => `列${i + 1}`) || []
+    }
+    
+    if (content.headers?.rows) {
+      rowHeaders.value = [...content.headers.rows]
+    } else {
+      rowHeaders.value = firstTable.map((_, i) => `行${i + 1}`) || []
+    }
+  } else if (content.data && Array.isArray(content.data)) {
+    const firstItem = content.data[0]
+    if (firstItem && typeof firstItem === 'object' && !Array.isArray(firstItem)) {
+      dataType.value = 'objectArray'
+      editableData.value.objectArray = content.data.map(item => ({ ...item }))
+      
+      const keys = Object.keys(firstItem)
+      if (content.headers?.columns) {
+        tableHeaders.value = [...content.headers.columns]
+      } else {
+        tableHeaders.value = keys
+      }
+      
+      if (content.headers?.rows) {
+        rowHeaders.value = [...content.headers.rows]
+      } else {
+        rowHeaders.value = content.data.map((_, i) => `数据${i + 1}`)
+      }
+    }
   }
   
   emitDataUpdate()
@@ -825,6 +912,8 @@ function emitDataUpdate() {
     updatedData.data = editableData.value.ranges.map(item => ({ ...item }))
   } else if (dataType.value === 'daily') {
     updatedData.data = editableData.value.data.map(item => ({ ...item }))
+  } else if (dataType.value === 'objectArray') {
+    updatedData.data = editableData.value.objectArray.map(item => ({ ...item }))
   }
   
   emit('dataChange', updatedData)
