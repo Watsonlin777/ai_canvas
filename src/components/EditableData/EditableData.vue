@@ -797,6 +797,8 @@ function loadData() {
     tableHeaders.value = firstTable[0]?.map((_, i) => `列${i + 1}`) || []
     rowHeaders.value = firstTable.map((_, i) => `行${i + 1}`) || []
   }
+  
+  emitDataUpdate()
 }
 
 function handleDataChange() {
