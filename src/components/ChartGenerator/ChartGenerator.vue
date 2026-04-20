@@ -200,7 +200,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['dataChange'])
+const emit = defineEmits(['dataChange', 'dragEnd'])
 
 const {
   panelRef,
@@ -986,11 +986,21 @@ function handleMouseDown(params) {
   }
   
   const handleMouseUp = () => {
+    const previousDragIndex = dragIndex.value
     dragIndex.value = -1
     dragValue.value = null
+    
     if (dragFeedback) {
       dragFeedback.hide()
     }
+    
+    if (previousDragIndex >= 0) {
+      emit('dragEnd', { changedIndex: previousDragIndex })
+      
+      const updatedData = getCurrentTableData()
+      emit('dataChange', updatedData)
+    }
+    
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
   }
@@ -1164,6 +1174,40 @@ function updateDataValue(index, value) {
   }
   
   emit('dataChange', props.data)
+}
+
+function getCurrentTableData() {
+  if (props.data?.type === 'table') {
+    const data = props.data?.data || []
+    return {
+      type: 'table',
+      data: data,
+      headers: {
+        columns: props.data?.headers?.columns || (data[0]?.map((_, i) => `列${i + 1}`) || []),
+        rows: props.data?.headers?.rows || data.map((_, i) => `行${i + 1}`)
+      }
+    }
+  } else if (props.data?.type === 'categories') {
+    return {
+      type: 'categories',
+      data: props.data?.data || [],
+      headers: {}
+    }
+  } else if (props.data?.type === 'ranges') {
+    return {
+      type: 'ranges',
+      data: props.data?.data || [],
+      headers: {}
+    }
+  } else if (props.data?.type === 'daily') {
+    return {
+      type: 'daily',
+      data: props.data?.data || [],
+      headers: {}
+    }
+  }
+  
+  return props.data
 }
 
 onMounted(() => {

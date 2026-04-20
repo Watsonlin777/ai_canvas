@@ -148,6 +148,8 @@
           :data="chartData" 
           :scene="currentScene"
           :viewMode="viewMode"
+          @dataChange="handleChartDataChange"
+          @dragEnd="handleChartDragEnd"
         />
       </div>
     </div>
@@ -368,6 +370,26 @@ function handleDataChange(updatedData) {
 
 function handleViewModeChange(mode) {
   viewMode.value = mode
+}
+
+function handleChartDataChange(updatedData) {
+  chartData.value = updatedData
+  
+  if (updatedData?.data && currentScene.value?.content) {
+    currentScene.value = {
+      ...currentScene.value,
+      content: {
+        ...currentScene.value.content,
+        data: updatedData.data
+      }
+    }
+  }
+  
+  autoSave()
+}
+
+function handleChartDragEnd({ changedIndex }) {
+  console.log('[SceneContent] Chart drag ended, changed index:', changedIndex)
 }
 
 function autoSave() {

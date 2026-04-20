@@ -66,6 +66,8 @@ import { useChartStore } from '../../store/chartStore'
 import gsap from 'gsap'
 import { createDragFeedback } from '../../utils/chartDrag'
 
+const emit = defineEmits(['dataChange', 'dragEnd'])
+
 use([
   CanvasRenderer,
   BarChart,
@@ -413,11 +415,30 @@ function handleMouseDown(params) {
   
   const handleMouseUp = () => {
     isDragging.value = false
+    const previousDragIndex = dragIndex.value
     dragIndex.value = -1
+    
     if (dragFeedback) {
       dragFeedback.hide()
     }
+    
     chartStore.saveSettings()
+    
+    emit('dragEnd', {
+      dataItems: chartStore.dataItems,
+      changedIndex: previousDragIndex
+    })
+    
+    const tableData = convertToTableFormat(chartStore.dataItems)
+    emit('dataChange', {
+      type: 'table',
+      data: tableData,
+      headers: {
+        columns: chartStore.labels.value,
+        rows: chartStore.values.value.map((v, i) => `数据${i + 1}`)
+      }
+    })
+    
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
   }
@@ -548,6 +569,17 @@ function handleTouchStart(params) {
     chartContainer.value.addEventListener('touchend', handleTouchEnd)
     chartContainer.value.addEventListener('touchcancel', handleTouchEnd)
   }
+}
+
+function convertToTableFormat(dataItems) {
+  if (!dataItems || dataItems.length === 0) {
+    return [[]]
+  }
+  
+  const labels = dataItems.map(item => item.label)
+  const values = dataItems.map(item => item.value)
+  
+  return [labels, values]
 }
 
 onMounted(() => {
