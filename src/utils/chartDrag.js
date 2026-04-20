@@ -191,7 +191,7 @@ export function createDragFeedback(container, options = {}) {
     formatValue = (val) => val.toFixed(1),
     position = 'top',
     offset = 10,
-    duration = 200,
+    duration = 120,
     edgeThreshold = 0.1,
     showEdgeWarning = true,
     fixedContainer = null,
