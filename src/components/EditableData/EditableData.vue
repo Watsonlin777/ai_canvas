@@ -1156,13 +1156,18 @@ watch(tableHeaders, () => {
   setTimeout(() => {
     if (columnHeadersRef.value) {
       const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
-      const widths = []
-      
-      headerCells.forEach((cell, index) => {
-        widths[index] = cell.offsetWidth
+      headerCells.forEach((cell) => {
+        cell.style.width = ''
+        cell.style.flex = ''
+        
+        const input = cell.querySelector('.header-input')
+        if (input) {
+          input.style.width = ''
+          input.style.minWidth = ''
+        }
       })
       
-      columnWidths.value = [...widths]
+      syncColumnWidthsFromHeader()
     }
   }, 50)
 }, { deep: true })
@@ -1170,7 +1175,9 @@ watch(tableHeaders, () => {
 onMounted(() => {
   loadData()
   
-  const syncColumnWidths = () => {
+  let widthSyncSource = 'table'
+  
+  const syncColumnWidthsFromHeader = () => {
     if (!columnHeadersRef.value) return
     
     const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
@@ -1186,6 +1193,44 @@ onMounted(() => {
     }
     
     columnWidths.value = [...widths]
+    widthSyncSource = 'header'
+  }
+  
+  const syncColumnWidthsFromTable = () => {
+    if (!tableRef.value) return
+    
+    const rows = tableRef.value.querySelectorAll('tr')
+    if (rows.length === 0) return
+    
+    const firstRow = rows[0]
+    const cells = firstRow.querySelectorAll('td.data-cell')
+    const widths = []
+    
+    cells.forEach((cell, index) => {
+      widths[index] = cell.offsetWidth
+    })
+    
+    if (widths.length > 0) {
+      columnWidths.value = [...widths]
+      
+      if (columnHeadersRef.value) {
+        const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
+        headerCells.forEach((cell, index) => {
+          if (widths[index]) {
+            cell.style.width = widths[index] + 'px'
+            cell.style.flex = 'none'
+            
+            const input = cell.querySelector('.header-input')
+            if (input) {
+              input.style.width = ''
+              input.style.minWidth = ''
+            }
+          }
+        })
+      }
+      
+      widthSyncSource = 'table'
+    }
   }
   
   let isSyncing = false
@@ -1217,10 +1262,11 @@ onMounted(() => {
     })
   }
   
-  let resizeObserver = null
+  let headerResizeObserver = null
+  let tableResizeObserver = null
   
   if (columnHeadersRef.value) {
-    resizeObserver = new ResizeObserver((entries) => {
+    headerResizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         const width = entry.contentRect.width
         const columnCount = tableHeaders.value.length || 1
@@ -1232,13 +1278,31 @@ onMounted(() => {
         
         isCompactMode.value = width < totalMinWidth
         
-        syncColumnWidths()
+        if (widthSyncSource !== 'table') {
+          syncColumnWidthsFromHeader()
+        }
       }
     })
     
-    resizeObserver.observe(columnHeadersRef.value)
+    headerResizeObserver.observe(columnHeadersRef.value)
     
-    setTimeout(syncColumnWidths, 100)
+    setTimeout(syncColumnWidthsFromHeader, 100)
+  }
+  
+  if (tableWrapperRef.value) {
+    tableResizeObserver = new ResizeObserver(() => {
+      if (widthSyncSource !== 'header') {
+        syncColumnWidthsFromTable()
+      }
+    })
+    
+    tableResizeObserver.observe(tableWrapperRef.value)
+    
+    if (tableRef.value) {
+      tableResizeObserver.observe(tableRef.value)
+    }
+    
+    setTimeout(syncColumnWidthsFromTable, 150)
   }
   
   if (tableWrapperRef.value && columnHeadersRef.value) {
@@ -1247,8 +1311,11 @@ onMounted(() => {
   }
   
   return () => {
-    if (resizeObserver) {
-      resizeObserver.disconnect()
+    if (headerResizeObserver) {
+      headerResizeObserver.disconnect()
+    }
+    if (tableResizeObserver) {
+      tableResizeObserver.disconnect()
     }
     if (scrollRAF) {
       cancelAnimationFrame(scrollRAF)
@@ -1258,6 +1325,20 @@ onMounted(() => {
     }
     if (columnHeadersRef.value) {
       columnHeadersRef.value.removeEventListener('scroll', syncScrollFromHeader)
+    }
+    
+    if (columnHeadersRef.value) {
+      const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
+      headerCells.forEach((cell) => {
+        cell.style.width = ''
+        cell.style.flex = ''
+        
+        const input = cell.querySelector('.header-input')
+        if (input) {
+          input.style.width = ''
+          input.style.minWidth = ''
+        }
+      })
     }
   }
 })
@@ -1762,7 +1843,7 @@ onMounted(() => {
   align-items: center;
   gap: 4px;
   padding: 0 8px;
-  transition: min-width 0.3s ease;
+  transition: width 0.15s ease-out, min-width 0.3s ease;
 }
 
 .header-cell:last-of-type {
@@ -1770,15 +1851,18 @@ onMounted(() => {
 }
 
 .header-input {
-  flex: 1;
+  width: 100%;
+  min-width: 0;
   background: rgba(255, 255, 255, 0.2);
   border: none;
   border-radius: 4px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   color: white;
   font-size: 12px;
   font-weight: 600;
   text-align: center;
+  box-sizing: border-box;
+  transition: width 0.15s ease-out;
 }
 
 .header-input::placeholder {
@@ -1913,6 +1997,7 @@ onMounted(() => {
   padding: 4px;
   border: 1px solid #E1E4E8;
   overflow: hidden;
+  transition: width 0.15s ease-out;
 }
 
 .cell-input {
