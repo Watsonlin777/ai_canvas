@@ -124,7 +124,7 @@
         </div>
 
         <template v-if="viewMode === 'table'">
-          <div class="column-headers" v-if="showColHeaders">
+          <div class="column-headers" v-if="showColHeaders" ref="columnHeadersRef" :class="{ 'compact-mode': isCompactMode }">
             <div class="header-row">
               <div class="corner-cell" v-if="showRowHeaders">
                 <span class="corner-label">行\\列</span>
@@ -157,8 +157,17 @@
           </div>
           
           <div class="table-with-actions">
-            <div class="table-wrapper">
-              <table class="editable-table">
+            <div class="table-wrapper" ref="tableWrapperRef">
+              <table class="editable-table" ref="tableRef">
+                <colgroup>
+                  <col v-if="showRowHeaders" class="col-row-header">
+                  <col 
+                    v-for="(header, index) in tableHeaders" 
+                    :key="index"
+                    :class="'col-' + index"
+                    :style="{ width: columnWidths[index] ? columnWidths[index] + 'px' : '' }"
+                  />
+                </colgroup>
                 <tbody>
                   <tr v-for="(row, rowIndex) in editableData.rows" :key="rowIndex">
                     <td class="row-header-cell" v-if="showRowHeaders">
@@ -601,6 +610,12 @@ const {
 })
 
 const resizeHandles = createResizeHandles()
+
+const columnHeadersRef = ref(null)
+const tableWrapperRef = ref(null)
+const tableRef = ref(null)
+const isCompactMode = ref(false)
+const columnWidths = ref([])
 
 const dataType = ref('table')
 const valueKey = ref('value')
@@ -1137,8 +1152,114 @@ watch(() => props.scene, () => {
   loadData()
 }, { immediate: true, deep: true })
 
+watch(tableHeaders, () => {
+  setTimeout(() => {
+    if (columnHeadersRef.value) {
+      const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
+      const widths = []
+      
+      headerCells.forEach((cell, index) => {
+        widths[index] = cell.offsetWidth
+      })
+      
+      columnWidths.value = [...widths]
+    }
+  }, 50)
+}, { deep: true })
+
 onMounted(() => {
   loadData()
+  
+  const syncColumnWidths = () => {
+    if (!columnHeadersRef.value) return
+    
+    const headerCells = columnHeadersRef.value.querySelectorAll('.header-cell')
+    const widths = []
+    
+    headerCells.forEach((cell, index) => {
+      widths[index] = cell.offsetWidth
+    })
+    
+    if (showRowHeaders.value && columnHeadersRef.value.querySelector('.corner-cell')) {
+      const cornerCell = columnHeadersRef.value.querySelector('.corner-cell')
+      widths[-1] = cornerCell.offsetWidth
+    }
+    
+    columnWidths.value = [...widths]
+  }
+  
+  let isSyncing = false
+  let scrollRAF = null
+  
+  const syncScrollFromTable = () => {
+    if (isSyncing || !tableWrapperRef.value || !columnHeadersRef.value) return
+    
+    isSyncing = true
+    
+    if (scrollRAF) cancelAnimationFrame(scrollRAF)
+    
+    scrollRAF = requestAnimationFrame(() => {
+      columnHeadersRef.value.scrollLeft = tableWrapperRef.value.scrollLeft
+      isSyncing = false
+    })
+  }
+  
+  const syncScrollFromHeader = () => {
+    if (isSyncing || !tableWrapperRef.value || !columnHeadersRef.value) return
+    
+    isSyncing = true
+    
+    if (scrollRAF) cancelAnimationFrame(scrollRAF)
+    
+    scrollRAF = requestAnimationFrame(() => {
+      tableWrapperRef.value.scrollLeft = columnHeadersRef.value.scrollLeft
+      isSyncing = false
+    })
+  }
+  
+  let resizeObserver = null
+  
+  if (columnHeadersRef.value) {
+    resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const width = entry.contentRect.width
+        const columnCount = tableHeaders.value.length || 1
+        const minWidthPerColumn = 70
+        const cornerWidth = showRowHeaders.value ? 80 : 0
+        const addBtnWidth = 40
+        const gap = 2 * (columnCount + (showRowHeaders.value ? 1 : 0))
+        const totalMinWidth = (columnCount * minWidthPerColumn) + cornerWidth + addBtnWidth + gap
+        
+        isCompactMode.value = width < totalMinWidth
+        
+        syncColumnWidths()
+      }
+    })
+    
+    resizeObserver.observe(columnHeadersRef.value)
+    
+    setTimeout(syncColumnWidths, 100)
+  }
+  
+  if (tableWrapperRef.value && columnHeadersRef.value) {
+    tableWrapperRef.value.addEventListener('scroll', syncScrollFromTable)
+    columnHeadersRef.value.addEventListener('scroll', syncScrollFromHeader)
+  }
+  
+  return () => {
+    if (resizeObserver) {
+      resizeObserver.disconnect()
+    }
+    if (scrollRAF) {
+      cancelAnimationFrame(scrollRAF)
+    }
+    if (tableWrapperRef.value) {
+      tableWrapperRef.value.removeEventListener('scroll', syncScrollFromTable)
+    }
+    if (columnHeadersRef.value) {
+      columnHeadersRef.value.removeEventListener('scroll', syncScrollFromHeader)
+    }
+  }
 })
 </script>
 
@@ -1595,22 +1716,35 @@ onMounted(() => {
 
 .column-headers {
   margin-bottom: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.column-headers::-webkit-scrollbar {
+  display: none;
 }
 
 .header-row {
   display: flex;
   align-items: center;
   gap: 2px;
+  min-width: max-content;
+  flex-wrap: nowrap;
 }
 
 .corner-cell {
   width: 80px;
+  min-width: 80px;
   height: 40px;
   background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
   border-radius: 6px 0 0 6px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .corner-label {
@@ -1620,14 +1754,15 @@ onMounted(() => {
 }
 
 .header-cell {
-  flex: 1;
-  min-width: 80px;
+  flex: 1 1 auto;
+  min-width: 70px;
   height: 40px;
   background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 0 8px;
+  transition: min-width 0.3s ease;
 }
 
 .header-cell:last-of-type {
@@ -1675,10 +1810,12 @@ onMounted(() => {
 
 .add-column-cell {
   width: 40px;
+  min-width: 40px;
   height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .btn-add-column {
@@ -1713,10 +1850,29 @@ onMounted(() => {
   border-radius: 0;
 }
 
+.table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+  border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #357ABD 0%, #2868A8 100%);
+}
+
 .editable-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+  table-layout: fixed;
 }
 
 .editable-table tbody tr {
@@ -1756,7 +1912,7 @@ onMounted(() => {
 .data-cell {
   padding: 4px;
   border: 1px solid #E1E4E8;
-  min-width: 80px;
+  overflow: hidden;
 }
 
 .cell-input {
@@ -1767,6 +1923,8 @@ onMounted(() => {
   text-align: center;
   font-size: 14px;
   transition: all 0.2s ease;
+  box-sizing: border-box;
+  display: block;
 }
 
 .cell-input:focus {
@@ -2552,5 +2710,38 @@ onMounted(() => {
   font-size: 14px;
   margin: 4px 0;
   line-height: 1.6;
+}
+
+.column-headers.compact-mode .header-cell {
+  min-width: 50px;
+}
+
+.column-headers.compact-mode .header-input {
+  font-size: 11px;
+  padding: 4px 6px;
+}
+
+.column-headers.compact-mode .btn-delete-col {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+}
+
+.column-headers.compact-mode .corner-cell {
+  width: 80px;
+  min-width: 80px;
+}
+
+.column-headers.compact-mode .corner-label {
+  font-size: 10px;
+}
+
+.column-headers.compact-mode ~ .table-with-actions .cell-input {
+  padding: 6px 4px;
+  font-size: 12px;
+}
+
+.column-headers.compact-mode ~ .table-with-actions .data-cell {
+  padding: 2px;
 }
 </style>
